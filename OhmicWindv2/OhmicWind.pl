@@ -29,7 +29,7 @@ for my $index (@indexes) {
 print $index;
 my $stringdx_1 = $name."_".$mysubnames[$index]; #OW_test
 my $outputs_path_1 = $folder_path."outputs/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
-my $vtksdir1 = $outputs_path_1."/vtks"; #OW_test/vtks
+my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
 `mkdir -p $vtksdir1`;
 
 ##################### .ini file #####################

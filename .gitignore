@@ -1,4 +1,14 @@
-/*/*/
+**/ignore/
+**/outputs/
+**/Makefile
+**/cmake_packages/
+**/CMakeFiles/
+**/generated/
+**/CMakeCache.txt
+**/git-state.txt
+**/idefix
+**/*.cmake
+**/build/
 **/*.out
 **/*.log
 **/*.mp4
