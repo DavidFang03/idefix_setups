@@ -10,10 +10,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import glob
 import ffmpeg
-from scipy.interpolate import griddata
+from scipy.interpolate import griddata, RegularGridInterpolator
 
 plt.style.use("dark_background")
-
+test_first_run = True
+if test_first_run:
+    run_movie = False
+else:
+    run_movie = True
 # PathToSimulation = (
 # "/mnt/lustre/tursafs1/home/dp316/dp316/dc-fang1/idefix/me/OhmicWind"
 # )
@@ -97,32 +101,119 @@ def RequirePath(path, dir_or_file=False):
         raise Exception("wrong value for dir_or_file")
 
 
-def streamplot(X, Y, Ux, Uy, resolution=200, method="linear"):
+def get_streamplot_data(
+    Xpoints, Ypoints, Ux_data, Uy_data, resolution=200, method="linear"
+):
     """
     X,Y must come from meshgrid, Ux and Uy are the data points.
     Returns the 1d arrays x_coords and y-coords, with the interpolated values Ux_uni, Uy_uni (2D arrays) that can go directly in streamplot
     """
-    x_min, x_max = np.nanmin(X), np.nanmax(X)
-    y_min, y_max = np.nanmin(Y), np.nanmax(Y)
+    X = Xpoints
+    Y = Ypoints
+    Ux = Ux_data
+    Uy = Uy_data
+    X = np.flip(Xpoints, axis=1)
+    Y = np.flip(Ypoints, axis=0)
+    print(X[0, :])
+    print(Y[:, 0])
+    Ux = np.flip(Ux_data, axis=1)
+    Uy = np.flip(Uy_data, axis=0)
+    x_min, x_max = np.min(X), np.max(X)
+    y_min, y_max = np.min(Y), np.max(Y)
 
     resolution = 200
     x_coords = x_min + np.arange(resolution) * ((x_max - x_min) / (resolution - 1))
     y_coords = y_min + np.arange(resolution) * ((y_max - y_min) / (resolution - 1))
 
-    X_uni, Z_uni = np.meshgrid(x_coords, y_coords)
+    X_uni, Y_uni = np.meshgrid(x_coords, y_coords)
+
+    # Ux_uni = RegularGridInterpolator(
+    #     (X[0, :], Y[:, 0]), Ux.T, fill_value=0, method=method, bounds_error=False
+    # )
+
+    # Uy_uni = RegularGridInterpolator(
+    #     (X[0, :], Y[:, 0]), Uy.T, fill_value=0, method=method, bounds_error=False
+    # )
 
     Ux_uni = griddata(
-        (X.flat, Y.flat), Ux.flat, (X_uni, Z_uni), fill_value=0, method=method
+        (X.flat, Y.flat), Ux.flat, (X_uni, Y_uni), fill_value=0, method=method
     )
     Uy_uni = griddata(
-        (X.flat, Y.flat), Uy.flat, (X_uni, Z_uni), fill_value=0, method=method
+        (X.flat, Y.flat), Uy.flat, (X_uni, Y_uni), fill_value=0, method=method
     )
-    print("streamline")
-    print(np.shape(Ux_uni))
-    print(np.shape(Uy_uni))
-    print(np.shape(X_uni))
-    print(np.shape(Z_uni))
+    # print("streamline")
+    # print(np.shape(Ux_uni))
+    # print(np.shape(Uy_uni))
+    # print(np.shape(X_uni))
+    # print(np.shape(Y_uni))
+    # pts = np.stack((X_uni, Y_uni), axis=-1)
+    # return (
+    #     x_coords,
+    #     y_coords,
+    #     Ux_uni(pts),
+    #     Uy_uni(pts),
+    # )
     return (x_coords, y_coords, Ux_uni, Uy_uni)
+
+
+# def get_streamplot_data(
+#     Xpoints, Ypoints, Ux_data, Uy_data, resolution=200, method="linear"
+# ):
+#     """
+#     X, Y doivent provenir d'un meshgrid. Ux et Uy sont les points de données.
+#     Renvoie les tableaux 1D x_coords et y_coords, avec les valeurs interpolées
+#     Ux_uni, Uy_uni (tableaux 2D) prêts pour plt.streamplot.
+#     """
+#     # 1. Extraire les coordonnées 1D
+#     x_1d = Xpoints[0, :]
+#     y_1d = Ypoints[:, 0]
+
+#     # 2. S'assurer qu'elles sont strictement croissantes (Requis par RegularGridInterpolator)
+#     idx_x = np.argsort(x_1d)
+#     idx_y = np.argsort(y_1d)
+
+#     x_1d_sorted = x_1d[idx_x]
+#     y_1d_sorted = y_1d[idx_y]
+
+#     # 3. Réordonner les données de vitesse en fonction des index triés
+#     Ux_sorted = Ux_data[np.ix_(idx_y, idx_x)]
+#     Uy_sorted = Uy_data[np.ix_(idx_y, idx_x)]
+
+#     # 4. Créer la nouvelle grille régulière
+#     x_min, x_max = x_1d_sorted[0], x_1d_sorted[-1]
+#     y_min, y_max = y_1d_sorted[0], y_1d_sorted[-1]
+
+#     x_coords = x_min + np.arange(resolution) * ((x_max - x_min) / (resolution - 1))
+#     y_coords = y_min + np.arange(resolution) * ((y_max - y_min) / (resolution - 1))
+
+#     X_uni, Y_uni = np.meshgrid(x_coords, y_coords)
+
+#     # 5. Créer les interpolateurs
+#     # On passe la transposée (.T) pour que les axes correspondent à (x, y)
+#     Ux_interp = RegularGridInterpolator(
+#         (x_1d_sorted, y_1d_sorted),
+#         Ux_sorted.T,
+#         fill_value=0,
+#         method=method,
+#         bounds_error=False,
+#     )
+#     Uy_interp = RegularGridInterpolator(
+#         (x_1d_sorted, y_1d_sorted),
+#         Uy_sorted.T,
+#         fill_value=0,
+#         method=method,
+#         bounds_error=False,
+#     )
+
+#     # 6. Évaluer les interpolateurs en empilant les points proprement
+#     pts = np.stack((X_uni, Y_uni), axis=-1)
+
+#     return (
+#         x_coords,
+#         y_coords,
+#         Ux_interp(pts),
+#         Uy_interp(pts),
+#     )
 
 
 class RUN:
@@ -162,6 +253,19 @@ class RUN:
         self.data_info["vtk"].set_data_test(
             lambda path: readVTK(path, geometry="spherical").data
         )
+
+        if self.data_info["slice1"].status:
+            vtk = readVTK(self.data_info["slice1"].test_file, geometry="spherical")
+            R = vtk.r
+            Theta = vtk.theta
+            self.R, self.Theta = np.meshgrid(R, Theta)
+            self.X = self.R * np.sin(self.Theta)
+            self.Z = self.R * np.cos(self.Theta)
+            fig, ax = plt.subplots(2)
+            ax[0].plot(self.R[0, :])
+            ax[1].plot(self.Z[:, 0])
+            fig.savefig(f"{self.slice1_folder}/mesh.png")
+            plt.close(fig)
 
         self.bounded = False
 
@@ -219,16 +323,10 @@ class RUN:
         print(slice1_path)
         V = readVTK(slice1_path, geometry="spherical")
 
-        R = V.r
-        Theta = V.theta
-        Phi = V.phi
-        print(Phi)
-        print(np.shape(R), np.shape(Theta))
-
-        R, Theta = np.meshgrid(V.r, V.theta)
-        print(np.shape(R), np.shape(Theta))
-        X = R * np.sin(Theta)
-        Z = R * np.cos(Theta)
+        R = self.R
+        Theta = self.Theta
+        X = self.X
+        Z = self.Z
         # Z = np.flip(Z)  # increasing z for streamplot
 
         for qt in V.data:
@@ -240,12 +338,21 @@ class RUN:
         Br = V.data["BX1"]
         Btheta = V.data["BX2"]
         Bphi = V.data["BX3"]
+        vr = V.data["VX1"]
+        vtheta = V.data["VX2"]
+        vphi = V.data["VX3"]
 
         V.data["Bx"] = np.sin(Theta) * Br + np.cos(Theta) * Btheta
         V.data["Bz"] = np.cos(Theta) * Br - np.sin(Theta) * Btheta
         V.data["By"] = Bphi
+        V.data["vx"] = np.sin(Theta) * vr + np.cos(Theta) * vtheta
+        V.data["vz"] = np.cos(Theta) * vr - np.sin(Theta) * vtheta
+        V.data["vy"] = vphi
 
-        (x_coords, z_coords, Bx_uni, Bz_uni) = streamplot(
+        (x_coords, z_coords, Bx_uni, Bz_uni) = get_streamplot_data(
+            X, Z, V.data["Bx"], V.data["Bz"]
+        )
+        (v_xpoints, v_zpoints, vx_uni, vz_uni) = get_streamplot_data(
             X, Z, V.data["Bx"], V.data["Bz"]
         )
 
@@ -263,12 +370,32 @@ class RUN:
                 # rasterized=True,
             )
 
+            print(x_coords, z_coords, Bx_uni, Bz_uni)
             axs[row, column].streamplot(
-                x_coords,
-                z_coords,
-                Bx_uni,
-                Bz_uni,
-                density=[0.5, 1],
+                x_coords, z_coords, Bx_uni, Bz_uni, density=[0.5, 1]
+            )
+
+            fig.colorbar(map, ax=axs[row, column])
+            axs[row, column].set_xlabel(r"$x$")
+            axs[row, column].set_ylabel(r"$z$")
+            axs[row, column].set_title(rf"${dir}$")
+
+        for i, dir in enumerate(["vx", "vy", "vz", "RHO"]):
+            row = i % 3
+            column = i // 3 + 1
+            data = V.data[dir]
+            map = axs[row, column].pcolormesh(
+                X,
+                Z,
+                data,
+                # vmin=bounds_dict[dir][0],
+                # vmax=bounds_dict[dir][1],
+                # shading="flat",
+                # rasterized=True,
+            )
+
+            axs[row, column].streamplot(
+                v_xpoints, v_zpoints, vx_uni, vz_uni, density=[0.5, 2], linewidth=1
             )
 
             fig.colorbar(map, ax=axs[row, column])
@@ -293,13 +420,18 @@ class RUN:
                 bounds_dict[qt] = (
                     get_bounds(self.slice1_list, qt) if self.bounded else [None, None]
                 )
+            if test_first_run:
+                for slice1_path in [self.slice1_list[0]]:
+                    self.slice_to_png(slice1_path, bounds_dict)
+            else:
+                for slice1_path in self.slice1_list:
+                    self.slice_to_png(slice1_path, bounds_dict)
 
-            for slice1_path in [self.slice1_list[0]]:
-                self.slice_to_png(slice1_path, bounds_dict)
-        # movie(
-        #     self.slice1_folder,
-        #     f"{self.videos_folder}/slice1{'_bounded' if self.bounded else ''}.mp4",
-        # )
+        if run_movie:
+            movie(
+                self.slice1_folder,
+                f"{self.videos_folder}/slice1{'_bounded' if self.bounded else ''}.mp4",
+            )
 
     # def plot_vtk(self, jump_to_movie=False):
 
@@ -331,7 +463,7 @@ def do_task(task):
 if __name__ == "__main__":
     sequential = True
 
-    tasks = ["OW_test"]
+    tasks = ["OW_test", "OW_test2"]
     if sequential:
         for task in tasks:
             do_task(task)

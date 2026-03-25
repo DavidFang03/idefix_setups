@@ -214,6 +214,7 @@ class RUN:
         slice1_name = os.path.basename(slice1_path)
         slice1_png_path = f"{self.slice1_folder}/{slice1_name[:-4]}.png"
         fig.savefig(slice1_png_path)
+        plt.close(fig)
 
     def plot_slice(self, jump_to_movie=False):
 

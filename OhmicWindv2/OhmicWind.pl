@@ -6,15 +6,17 @@ use warnings;
 # The directory where calculations are run
 my $IDEFIX_DIR="/home/dp316/dp316/dc-fang1/myidefix";
 # my $SETUP_DIR="/home/dp316/dp316/dc-fang1/myidefix/david/OhmicWind";
-my $outdir = "/home/dp316/dp316/dc-fang1/outputs/OhmicWind/";
-my $indir = $outdir."in/";
-my $name = "OW";
-my $time   = "00:30:00";
+# my $outdir = "/home/dp316/dp316/dc-fang1/outputs/OhmicWind/";
+my $folder_name = "OhmicWindv2";
+my $folder_path = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
+my $indir = $folder_path."inputs/";
+my $time   = "00:60:00";
 my $nodes = "1";
 my $gres = "gpu:4";
 my $ntasks_per_node= "4";
-my $IDEFIX_EXE="/home/dp316/dp316/dc-fang1/myidefix/david/OhmicWind/idefix";
-my $options = "-dec 1 4";
+my $IDEFIX_EXE=$folder_path."src/idefix";
+my $options = "-dec 4 1";
+my $name = "OW";
 my @mysubnames = ("test");
 
 my @indexes = (0);
@@ -22,16 +24,16 @@ my @indexes = (0);
 #my $maxindex = @myindex;
 #my $maxindex = 3;
 
-`mkdir -p $indir`;
+# `mkdir -p $indir`;
 for my $index (@indexes) {
 print $index;
-my $stringdx = $name."_".$mysubnames[$index]; #OW_test
-my $output1 = $outdir.$stringdx;
-my $vtksdir1 = $output1."/vtks"; #OW_test/vtks
+my $stringdx_1 = $name."_".$mysubnames[$index]; #OW_test
+my $outputs_path_1 = $folder_path."outputs/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
+my $vtksdir1 = $outputs_path_1."/vtks"; #OW_test/vtks
 `mkdir -p $vtksdir1`;
 
 ##################### .ini file #####################
-my $inifile = $indir.$stringdx.".ini";
+my $inifile = $indir.$stringdx_1.".ini";
 open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
@@ -45,11 +47,12 @@ tstop          10000000.0
 # tstop            1000.0
 first_dt       1.e-6
 nstages        2
-max_runtime    19.8
+max_runtime    59
 
 [Hydro]
 solver       hlld
-resistivity    explicit  userdef
+# ambipolar    explicit  userdef
+resistivity  explicit  userdef
 gamma        1.0001
 
 [Gravity]
@@ -63,20 +66,21 @@ X2-beg    axis
 X2-end    axis
 
 [Setup]
-epsilon                0.05
-beta                   1000
-epsilonTop             0.3
-Hideal                 5.0
+epsilon                0.1
+beta                   10000
+epsilonTop             0.4
+Hideal                 4.0
+# Am                     1.0
 densityFloor           1.0e-7
 transitionSmoothing    0.5
 
 [Output]
-uservar    InvDt
-vtk        0.1
+uservar    Am    InvDt
+vtk        2
 log        1000
 vtk_dir    $vtksdir1
-dat_path   $output1/timevol.dat
-analysis   0.1
+dat_path   $outputs_path_1/timevol.dat
+analysis   1
 
 # [Output]
 # 
@@ -89,13 +93,13 @@ analysis   0.1
 ENDOFINI
 
 # Batch script
-my $script = $indir.$stringdx.".sh";
+my $script = $indir.$stringdx_1.".sh";
 open SCRIPT, ">$script";
 print SCRIPT <<ENDOFSCRIPT;
 #!/bin/bash
 
 # Slurm job options (job-name, compute nodes, job time)
-#SBATCH --job-name=$stringdx
+#SBATCH --job-name=$stringdx_1
 #SBATCH --time=$time
 #SBATCH --partition=gpu
 #SBATCH --qos=dev
@@ -108,7 +112,7 @@ print SCRIPT <<ENDOFSCRIPT;
 
 #SBATCH --account=dp316
 
-cd $outdir
+cd $folder_path."src"
 # Load the correct modules for the run
 
 module load gcc/9.3.0
