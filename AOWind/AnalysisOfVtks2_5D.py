@@ -357,7 +357,8 @@ class RUN:
             "cs": Quantity2D("cs", r"$c_s$"),
             "Mach_p": Quantity2D("Mach_p", r"$\text{Mach}_\text{p}$"),
             "eta": Quantity2D("eta", r"$\eta$"),
-            "Rm": Quantity2D("Rm", r"$\text{R}_\text{m}$"),
+            "Am": Quantity2D("Am", r"$\text{Am}$"),
+            # "Rm": Quantity2D("Rm", r"$\text{R}_\text{m}$"),
         }
 
         for i, qty in enumerate(self.quantities2D.keys()):
@@ -440,7 +441,7 @@ class RUN:
         self.analysis = self.data_info["analysis"].data_test
         fig, axs = plt.subplots(2, 2, figsize=(16, 12))
         fig.suptitle(self.DataPath)
-        fig.subplots_adjust(left=0.1, right=1 - 0.05, top=0.8, hspace=0.3, wspace=0.2)
+        fig.subplots_adjust(left=0.1, right=1 - 0.05, top=0.75, hspace=0.3, wspace=0.2)
         a = self.analysis
         t = a["t"]
         self.quantities1D = {
@@ -496,12 +497,13 @@ class RUN:
             V.data["cs"],
         )
 
-        X = self.X
-        epsilon = 0.1
-        Omega = np.pow(X, -1.5)
-        V.data["Rm"] = divide_discardingNullDenominator(
-            Omega * np.pow(epsilon * X, 2), V.data["eta"]
-        )
+        # Reynolds number
+        # X = self.X
+        # epsilon = 0.1
+        # Omega = np.pow(X, -1.5)
+        # V.data["Rm"] = divide_discardingNullDenominator(
+        #     Omega * np.pow(epsilon * X, 2), V.data["eta"]
+        # )
         # V.data["rho"] = np.log10(V.data["RHO"])
 
         # V.data["Mach_p"] = applyOperation_discardingNone(np.log10, V.data["Mach_p"])
@@ -792,8 +794,7 @@ class RUN:
 
 
 def do_task(task):
-    PathToProject = "/home/dp316/dp316/dc-fang1/IdefixRuns/OhmicWindv2"
-    # RunName = f"/home/dp316/dp316/dc-fang1/IdefixRuns/OhmicWindv2/"
+    PathToProject = "/home/dp316/dp316/dc-fang1/IdefixRuns/AOWind"
 
     run = RUN(PathToProject, task, end=1)
     run.print_available_quantities()
@@ -802,7 +803,7 @@ def do_task(task):
 
 
 if __name__ == "__main__":
-    tasks = ["OW_Rm10_etabuff1000"]
+    tasks = ["AOw_src"]
     # if sequential:
     for task in tasks:
         count = 0

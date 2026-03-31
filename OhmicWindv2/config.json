@@ -1,0 +1,68 @@
+{
+    "default": {
+        "BX1": {
+            "range": [
+                -1e-4,
+                1e-4
+            ]
+        },
+        "BX2": {
+            "range": [
+                -1e-4,
+                1e-4
+            ]
+        },
+        "BX3": {
+            "range": [
+                -1e-4,
+                1e-4
+            ]
+        },
+        "VX1": {
+            "range": [
+                -0.5,
+                2
+            ]
+        },
+        "VX2": {
+            "range": [
+                -0.5,
+                0.5
+            ]
+        },
+        "VX3": {
+            "range": [
+                -0.5,
+                0.5
+            ]
+        },
+        "cs": {
+            "norm": "log"
+        },
+        "RHO": {
+            "norm": "log",
+            "range": [
+                1e-8,
+                1
+            ]
+        },
+        "Mach_p": {
+            "range": [
+                0.1,
+                20
+            ],
+            "cmap": "cool",
+            "norm": "log"
+        },
+        "eta": {
+            "cmap": "inferno"
+        },
+        "Rm": {
+            "range": [
+                0.1,
+                1e2
+            ],
+            "cmap": "magma_r"
+        }
+    }
+}

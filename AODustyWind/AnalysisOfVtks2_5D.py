@@ -41,9 +41,9 @@ else:
 plt.style.use("dark_background")
 plt.rcParams["hatch.color"] = "gray"
 plt.rcParams["hatch.linewidth"] = 0.5
-test_first_run = False
+test_first_run = True
 sequential = True
-bounded = True
+bounded = False
 if test_first_run:
     run_movie = False
     sequential = True  # safety guard
@@ -356,9 +356,26 @@ class RUN:
             "RHO": Quantity2D("RHO", r"$\rho$"),
             "cs": Quantity2D("cs", r"$c_s$"),
             "Mach_p": Quantity2D("Mach_p", r"$\text{Mach}_\text{p}$"),
-            "eta": Quantity2D("eta", r"$\eta$"),
-            "Rm": Quantity2D("Rm", r"$\text{R}_\text{m}$"),
+            "eta": Quantity2D("eta", r"$\eta_\text{O}$"),
+            "Am": Quantity2D("Am", r"$\text{Am}$"),
+            # "Rm": Quantity2D("Rm", r"$\text{R}_\text{m}$"),
         }
+
+        self.dust = False
+        self.print_available_quantities()
+        if self.dust:
+            self.quantities2D["Dust0_RHO"] = Quantity2D(
+                "Dust0_RHO", r"$\rho_\text{dust}$"
+            )
+            self.quantities2D["Dust0_VX1"] = Quantity2D(
+                "Dust0_VX1", r"$v_r^\text{dust}$"
+            )
+            self.quantities2D["Dust0_VX2"] = Quantity2D(
+                "Dust0_VX2", r"$v_\theta^\text{dust}$"
+            )
+            self.quantities2D["Dust0_VX3"] = Quantity2D(
+                "Dust0_VX3", r"$v_\phi^\text{dust}$"
+            )
 
         for i, qty in enumerate(self.quantities2D.keys()):
             row = i % 3
@@ -435,12 +452,14 @@ class RUN:
                     print(
                         f"{qt:>10} {np.shape(self.data_info[data_type].data_test[qt].data)}"
                     )
+                    if qt == "Dust0_RHO":
+                        self.dust = True
 
     def plot_analysis(self):
         self.analysis = self.data_info["analysis"].data_test
         fig, axs = plt.subplots(2, 2, figsize=(16, 12))
         fig.suptitle(self.DataPath)
-        fig.subplots_adjust(left=0.1, right=1 - 0.05, top=0.8, hspace=0.3, wspace=0.2)
+        fig.subplots_adjust(left=0.1, right=1 - 0.05, top=0.75, hspace=0.3, wspace=0.2)
         a = self.analysis
         t = a["t"]
         self.quantities1D = {
@@ -496,12 +515,13 @@ class RUN:
             V.data["cs"],
         )
 
-        X = self.X
-        epsilon = 0.1
-        Omega = np.pow(X, -1.5)
-        V.data["Rm"] = divide_discardingNullDenominator(
-            Omega * np.pow(epsilon * X, 2), V.data["eta"]
-        )
+        # Reynolds number
+        # X = self.X
+        # epsilon = 0.1
+        # Omega = np.pow(X, -1.5)
+        # V.data["Rm"] = divide_discardingNullDenominator(
+        #     Omega * np.pow(epsilon * X, 2), V.data["eta"]
+        # )
         # V.data["rho"] = np.log10(V.data["RHO"])
 
         # V.data["Mach_p"] = applyOperation_discardingNone(np.log10, V.data["Mach_p"])
@@ -565,11 +585,12 @@ class RUN:
         return bounds
 
     def slice_to_png(self, slice1_path):
-        rows, columns = 3, 4
+        rows, columns = 3, 5
         cbars = np.full((rows, columns), None)
         fig, axs = plt.subplots(rows, columns, figsize=(4 * columns, 16))
-        fig.patch.set_linewidth(10)
-        fig.patch.set_edgecolor("cornflowerblue")
+        if do_zoom:
+            fig.patch.set_linewidth(10)
+            fig.patch.set_edgecolor("cornflowerblue")
         fig.subplots_adjust(
             left=0.05,
             right=1 - 0.05,
@@ -608,7 +629,18 @@ class RUN:
                     Bz_uni,
                     streamline_name=r"$B_p$",
                 )
-            for qty in ["VX1", "VX2", "VX3", "RHO", "cs", "Mach_p"]:
+            for qty in [
+                "VX1",
+                "VX2",
+                "VX3",
+                "RHO",
+                "cs",
+                "Mach_p",
+                "Dust0_RHO",
+                "Dust0_VX1",
+                "Dust0_VX2",
+                "Dust0_VX3",
+            ]:
                 self.quantities2D[qty].set_streamline_toshow(
                     x_coords,
                     z_coords,
@@ -792,17 +824,15 @@ class RUN:
 
 
 def do_task(task):
-    PathToProject = "/home/dp316/dp316/dc-fang1/IdefixRuns/OhmicWindv2"
-    # RunName = f"/home/dp316/dp316/dc-fang1/IdefixRuns/OhmicWindv2/"
+    PathToProject = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyWind"
 
     run = RUN(PathToProject, task, end=1)
-    run.print_available_quantities()
     run.plot_slice(jump_to_movie=False)
     # run.plot_analysis()
 
 
 if __name__ == "__main__":
-    tasks = ["OW_Rm10_etabuff1000"]
+    tasks = ["AODw_src"]
     # if sequential:
     for task in tasks:
         count = 0

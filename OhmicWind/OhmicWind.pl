@@ -17,16 +17,10 @@ my $ntasks_per_node= "4";
 my $IDEFIX_EXE=$folder_path."src/idefix";
 my $options = "-dec 4 1";
 my $name = "OW";
-# my @mysubnames = ("Rm1", "Rm10", "Rm100");
-# my @myRm = (1,10,100);
+my @mysubnames = ("Rm1", "Rm10", "Rm100");
+my @myRm = (1,10,100);
 
-# my @indexes = (0, 1 ,2);
-
-my @mysubnames = ("Rm10_etabuff1000");
-my @myRm = (1);
-my @myetab0 = (1000);
-
-my @indexes = (0);
+my @indexes = (0, 1 ,2);
 # Loop starts here
 #my $maxindex = @myindex;
 #my $maxindex = 3;
@@ -74,7 +68,6 @@ X2-end    axis
 
 [Setup]
 Rm0                  $myRm[$index]
-etab0                  $myetab0[$index]
 epsilon                0.1
 beta                   10000
 epsilonTop             0.4
@@ -84,9 +77,8 @@ densityFloor           1.0e-7
 transitionSmoothing    0.5
 
 [Output]
-uservar    eta     Am    InvDt
+uservar    Am    InvDt
 vtk        2
-dmp_dir    $outputs_path_1
 log        1000
 vtk_dir    $vtksdir1
 dat_path   $outputs_path_1/timevol.dat

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Slurm job options (job-name, compute nodes, job time)
-#SBATCH --job-name=OW_test
-#SBATCH --time=00:30:00
+#SBATCH --job-name=AW_src_uniTheta_dec41
+#SBATCH --time=00:15:00
 #SBATCH --partition=gpu
 #SBATCH --qos=dev
 
@@ -14,7 +14,7 @@
 
 #SBATCH --account=dp316
 
-cd /home/dp316/dp316/dc-fang1/outputs/OhmicWind/
+cd /home/dp316/dp316/dc-fang1/IdefixRuns/AmbipolarWind/setup
 # Load the correct modules for the run
 
 module load gcc/9.3.0
@@ -32,4 +32,4 @@ export OMP_PLACES=cores
 srun --nodes=1 --ntasks-per-node=4 \
      --hint=nomultithread  --distribution=block:block \
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \
-     /home/dp316/dp316/dc-fang1/myidefix/david/OhmicWind/idefix -dec 1 4 -i /home/dp316/dp316/dc-fang1/outputs/OhmicWind/in/OW_test.ini
+     /home/dp316/dp316/dc-fang1/IdefixRuns/AmbipolarWind/setup/idefix -dec 4 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AmbipolarWind/inputs/AW_src_uniTheta_dec41.ini

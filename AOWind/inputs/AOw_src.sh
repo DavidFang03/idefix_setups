@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Slurm job options (job-name, compute nodes, job time)
-#SBATCH --job-name=OW_test
-#SBATCH --time=00:60:00
+#SBATCH --job-name=AOw_src
+#SBATCH --time=00:15:00
 #SBATCH --partition=gpu
 #SBATCH --qos=dev
 
@@ -14,7 +14,7 @@
 
 #SBATCH --account=dp316
 
-cd /home/dp316/dp316/dc-fang1/IdefixRuns/OhmicWindv2/."src"
+cd /home/dp316/dp316/dc-fang1/IdefixRuns/AOWind/setup
 # Load the correct modules for the run
 
 module load gcc/9.3.0
@@ -32,4 +32,4 @@ export OMP_PLACES=cores
 srun --nodes=1 --ntasks-per-node=4 \
      --hint=nomultithread  --distribution=block:block \
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \
-     /home/dp316/dp316/dc-fang1/IdefixRuns/OhmicWindv2/src/idefix -dec 4 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/OhmicWindv2/inputs/OW_test.ini
+     /home/dp316/dp316/dc-fang1/IdefixRuns/AOWind/setup/idefix -restart -dec 4 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AOWind/inputs/AOw_src.ini

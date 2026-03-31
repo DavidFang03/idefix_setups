@@ -5,31 +5,22 @@ use warnings;
 
 # The directory where calculations are run
 my $IDEFIX_DIR="/home/dp316/dp316/dc-fang1/myidefix";
-# my $SETUP_DIR="/home/dp316/dp316/dc-fang1/myidefix/david/OhmicWind";
-# my $outdir = "/home/dp316/dp316/dc-fang1/outputs/OhmicWind/";
-my $folder_name = "OhmicWindv2";
+my $folder_name = "AODustyWind";
 my $folder_path = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
 my $indir = $folder_path."inputs/";
-my $time   = "04:00:00";
+my $time   = "00:04:00";
 my $nodes = "1";
 my $gres = "gpu:4";
 my $ntasks_per_node= "4";
-my $IDEFIX_EXE=$folder_path."src/idefix";
-my $options = "-dec 4 1";
-my $name = "OW";
-# my @mysubnames = ("Rm1", "Rm10", "Rm100");
-# my @myRm = (1,10,100);
+my $IDEFIX_EXE=$folder_path."setup/idefix";
+my $options = "-restart -dec 4 1";
+my $name = "AODw";
 
-# my @indexes = (0, 1 ,2);
-
-my @mysubnames = ("Rm10_etabuff1000");
-my @myRm = (1);
-my @myetab0 = (1000);
+my @mysubnames = ("src");
+# my @myRm = (1);
+# my @myetab0 = (1000);
 
 my @indexes = (0);
-# Loop starts here
-#my $maxindex = @myindex;
-#my $maxindex = 3;
 
 # `mkdir -p $indir`;
 for my $index (@indexes) {
@@ -40,13 +31,15 @@ my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
 `mkdir -p $vtksdir1`;
 
 ##################### .ini file #####################
+`mkdir -p $indir`;
 my $inifile = $indir.$stringdx_1.".ini";
 open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
 X1-grid    1  1.0  768  l   100.0
-X2-grid    3  0.0  64   s+  1.28   96  u  1.861592653589  64  s-  3.141592653589793
+# X2-grid    3  0.0  64   s+  1.28   96  u  1.861592653589  64  s-  3.141592653589793
+X2-grid    1  0.0  512  u  3.141592653589793
 
 [TimeIntegrator]
 CFL            0.9
@@ -54,13 +47,20 @@ tstop          10000000.0
 # tstop            1000.0
 first_dt       1.e-6
 nstages        2
-max_runtime    3.9
+max_runtime    0.24
 
 [Hydro]
 solver       hlld
-# ambipolar    explicit  userdef
+ambipolar    explicit  userdef
 resistivity  explicit  userdef
 gamma        1.0001
+
+[Dust]
+nSpecies         1
+drag             tau  1.0
+drag_feedback    yes
+DustToGas        0.01
+# gamma_i = 1/(rho beta_i) where beta_i is the given value
 
 [Gravity]
 potential    central
@@ -73,18 +73,19 @@ X2-beg    axis
 X2-end    axis
 
 [Setup]
-Rm0                  $myRm[$index]
-etab0                  $myetab0[$index]
-epsilon                0.1
-beta                   10000
-epsilonTop             0.4
-Hideal                 4.0
-# Am                     1.0
+Rm0                    10.0
+etab0                  1.0
+epsilon                0.05
+beta                   1000
+# beta->10000?
+epsilonTop             0.3
+Hideal                 5.0
+Am                     1.0
 densityFloor           1.0e-7
 transitionSmoothing    0.5
 
 [Output]
-uservar    eta     Am    InvDt
+uservar    eta    Am    InvDt
 vtk        2
 dmp_dir    $outputs_path_1
 log        1000
@@ -122,7 +123,7 @@ print SCRIPT <<ENDOFSCRIPT;
 
 #SBATCH --account=dp316
 
-cd ${folder_path}src
+cd ${folder_path}setup
 # Load the correct modules for the run
 
 module load gcc/9.3.0
