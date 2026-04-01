@@ -32,9 +32,10 @@
         },
         "VX3": {
             "range": [
-                -0.5,
+                0,
                 0.5
-            ]
+            ],
+            "cmap": "inferno"
         },
         "cs": {
             "norm": "log"
@@ -42,9 +43,10 @@
         "RHO": {
             "norm": "log",
             "range": [
-                1e-8,
+                1e-7,
                 1
-            ]
+            ],
+            "cmap": "inferno"
         },
         "Mach_p": {
             "range": [
@@ -55,6 +57,33 @@
             "norm": "log"
         },
         "Am": {
+            "cmap": "inferno"
+        },
+        "Dust0_VX1": {
+            "range": [
+                -0.5,
+                2
+            ]
+        },
+        "Dust0_VX2": {
+            "range": [
+                -0.5,
+                0.5
+            ]
+        },
+        "Dust0_VX3": {
+            "range": [
+                0,
+                0.5
+            ],
+            "cmap": "inferno"
+        },
+        "Dust0_RHO": {
+            "norm": "log",
+            "range": [
+                1e-7,
+                1
+            ],
             "cmap": "inferno"
         }
     }

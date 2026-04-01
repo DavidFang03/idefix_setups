@@ -145,10 +145,15 @@ void Resistivity(DataBlock &data, real t, IdefixArray3D<real> &etain) {
         // + etaDZ;
         // eta(k, j, i) = etaDZ * TransDC * TransDZI + EtaBuffer;
         // eta(k, j, i) = EtaBuffer;
-        real eta0 = pow(epsilon * Ri, 2) * Omega / Rm0copy;
-        eta(k, j, i) = eta0 * (pow(Ri, 1.5)) * Vc(RHO, k, j, i) /
-                           (10.0 * 10.0 * pow(10, 0.5)) * TransDC +
+        // real eta0 = pow(epsilon * Ri, 2) * Omega / Rm0copy;
+        // eta0 = 0;
+        // Precription of Roberts,Latter,Lesur (2026): Rm propto 1/(rho R)
+        eta(k, j, i) = epsilon * epsilon * pow(Ri, 1.5) * Vc(RHO, k, j, i) /
+                           Rm0copy * TransDC +
                        EtaBuffer;
+        // eta(k, j, i) = eta0 * (pow(Ri, 1.5)) * Vc(RHO, k, j, i) /
+        //                    (10.0 * 10.0 * pow(10, 0.5)) * TransDC +
+        //                EtaBuffer;
       });
 }
 

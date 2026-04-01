@@ -12,9 +12,9 @@ import glob
 import ffmpeg
 from scipy.interpolate import RegularGridInterpolator
 import json
-from matplotlib.colors import LogNorm, Normalize
+from matplotlib.colors import LogNorm, Normalize, TwoSlopeNorm
 
-with open("config.json") as f:
+with open("/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyWind/config.json") as f:
     configs = json.load(f)
 
 
@@ -29,9 +29,9 @@ configs = process_configs(configs)
 
 count = 0
 
-do_zoom = False
+do_zoom = True
 if do_zoom:
-    zoom = 1.5
+    zoom = 20
 
 
 else:
@@ -41,9 +41,10 @@ else:
 plt.style.use("dark_background")
 plt.rcParams["hatch.color"] = "gray"
 plt.rcParams["hatch.linewidth"] = 0.5
-test_first_run = True
+
+test_first_run = False
 sequential = True
-bounded = False
+bounded = True
 if test_first_run:
     run_movie = False
     sequential = True  # safety guard
@@ -136,10 +137,11 @@ class Quantity1D:
 
 
 class Quantity2D:
-    def __init__(self, key, name):
+    def __init__(self, key, name, streamline=None):
         self.key = key
         self.name = name
         self.show_streamlines = False
+        self.streamline = streamline
 
     def set_data(self, data):
         self.data = data
@@ -153,14 +155,14 @@ class Quantity2D:
     def set_norm(self, norm):
         self.norm = norm
 
-    def set_streamline_toshow(self, xUni, yUni, UxUni, UyUni, streamline_name):
-        """
-        One can pcolormesh a given quantity but plot streamlines of a different quantity.
-        """
-        self.show_streamlines = True
-        self.xUni, self.yUni = xUni, yUni
-        self.UxUni, self.UyUni = UxUni, UyUni
-        self.streamline_name = streamline_name
+    # def set_streamline_toshow(self, xUni, yUni, UxUni, UyUni, streamline_name):
+    #     """
+    #     One can pcolormesh a given quantity but plot streamlines of a different quantity.
+    #     """
+    #     self.show_streamlines = True
+    #     self.xUni, self.yUni = xUni, yUni
+    #     self.UxUni, self.UyUni = UxUni, UyUni
+    #     self.streamline_name = streamline_name
 
     def set_plot_coords(self, i, j):
         self.coords = [i, j]
@@ -180,63 +182,8 @@ def RequirePath(path, dir_or_file=False):
         raise Exception("wrong value for dir_or_file")
 
 
-# def get_streamplot_data(
-#     Xpoints, Ypoints, Ux_data, Uy_data, resolution=200, method="linear"
-# ):
-#     """
-#     X,Y must come from meshgrid, Ux and Uy are the data points.
-#     Returns the 1d arrays x_coords and y-coords, with the interpolated values Ux_uni, Uy_uni (2D arrays) that can go directly in streamplot
-#     """
-#     X = Xpoints
-#     Y = Ypoints
-#     Ux = Ux_data
-#     Uy = Uy_data
-#     X = np.flip(Xpoints, axis=1)
-#     Y = np.flip(Ypoints, axis=0)
-#     print(X[0, :])
-#     print(Y[:, 0])
-#     Ux = np.flip(Ux_data, axis=1)
-#     Uy = np.flip(Uy_data, axis=0)
-#     x_min, x_max = np.min(X), np.max(X)
-#     y_min, y_max = np.min(Y), np.max(Y)
-
-#     resolution = 200
-#     x_coords = x_min + np.arange(resolution) * ((x_max - x_min) / (resolution - 1))
-#     y_coords = y_min + np.arange(resolution) * ((y_max - y_min) / (resolution - 1))
-
-#     X_uni, Y_uni = np.meshgrid(x_coords, y_coords)
-
-#     # Ux_uni = RegularGridInterpolator(
-#     #     (X[0, :], Y[:, 0]), Ux.T, fill_value=0, method=method, bounds_error=False
-#     # )
-
-#     # Uy_uni = RegularGridInterpolator(
-#     #     (X[0, :], Y[:, 0]), Uy.T, fill_value=0, method=method, bounds_error=False
-#     # )
-
-#     Ux_uni = griddata(
-#         (X.flat, Y.flat), Ux.flat, (X_uni, Y_uni), fill_value=0, method=method
-#     )
-#     Uy_uni = griddata(
-#         (X.flat, Y.flat), Uy.flat, (X_uni, Y_uni), fill_value=0, method=method
-#     )
-#     # print("streamline")
-#     # print(np.shape(Ux_uni))
-#     # print(np.shape(Uy_uni))
-#     # print(np.shape(X_uni))
-#     # print(np.shape(Y_uni))
-#     # pts = np.stack((X_uni, Y_uni), axis=-1)
-#     # return (
-#     #     x_coords,
-#     #     y_coords,
-#     #     Ux_uni(pts),
-#     #     Uy_uni(pts),
-#     # )
-#     return (x_coords, y_coords, Ux_uni, Uy_uni)
-
-
 def get_streamplot_data(
-    RLine, ThetaLine, Ux_data, Uy_data, resolution=200, method="linear"
+    RLine, ThetaLine, Ux_data, Uy_data, rmax=None, resolution=200, method="linear"
 ):
     """
     X,Y must come from meshgrid, Ux and Uy are the data points.
@@ -259,6 +206,8 @@ def get_streamplot_data(
     )
     r_min, r_max = np.min(RLine), np.max(RLine)
 
+    r_max = r_max if rmax is None else rmax
+
     x_coords = r_min + np.arange(resolution) * ((r_max - r_min) / (resolution - 1))
     z_min, z_max = -r_max, r_max
     z_coords = z_min + np.arange(resolution) * ((z_max - z_min) / (resolution - 1))
@@ -275,6 +224,18 @@ def get_streamplot_data(
         Ux_interp(pts),
         Uy_interp(pts),
     )
+
+
+class StreamLinesData:
+    def __init__(self, name, title=None):
+        self.name = name
+        self.title = name if title is None else title
+
+    def set_data(self, X, Z, dataX, dataZ):
+        self.X = X
+        self.Z = Z
+        self.dataX = dataX
+        self.dataZ = dataZ
 
 
 class RUN:
@@ -347,35 +308,40 @@ class RUN:
         )
 
         self.quantities2D = {
-            "BX1": Quantity2D("BX1", r"$B_r$"),
-            "BX2": Quantity2D("BX2", r"$B_\theta$"),
-            "BX3": Quantity2D("BX3", r"$B_\phi$"),
-            "VX1": Quantity2D("VX1", r"$v_r$"),
-            "VX2": Quantity2D("VX2", r"$v_\theta$"),
-            "VX3": Quantity2D("VX3", r"$v_\phi$"),
-            "RHO": Quantity2D("RHO", r"$\rho$"),
-            "cs": Quantity2D("cs", r"$c_s$"),
-            "Mach_p": Quantity2D("Mach_p", r"$\text{Mach}_\text{p}$"),
-            "eta": Quantity2D("eta", r"$\eta_\text{O}$"),
-            "Am": Quantity2D("Am", r"$\text{Am}$"),
-            # "Rm": Quantity2D("Rm", r"$\text{R}_\text{m}$"),
+            "BX1": Quantity2D("BX1", r"$B_r$", "Bp"),
+            "BX2": Quantity2D("BX2", r"$B_\theta$", "Bp"),
+            "BX3": Quantity2D("BX3", r"$B_\phi$", "Bp"),
+            "VX1": Quantity2D("VX1", r"$v_r$", "Vp"),
+            "VX2": Quantity2D("VX2", r"$v_\theta$", "Vp"),
+            "VX3": Quantity2D("VX3", r"$v_\phi$", "Vp"),
+            "RHO": Quantity2D("RHO", r"$\rho$", "Vp"),
+            "cs": Quantity2D("cs", r"$c_s$", "Vp"),
+            "Mach_p": Quantity2D("Mach_p", r"$\text{Mach}_\text{p}$", "Vp"),
+            "eta": Quantity2D("eta", r"$\eta_\text{O}$", "Vp"),
+            "Am": Quantity2D("Am", r"$\text{Am}$", "Vp"),
+            # "Rm": Quantity2D("Rm", r"$\text{R}_\text{m}$", "Vp"),
         }
 
         self.dust = False
         self.print_available_quantities()
         if self.dust:
             self.quantities2D["Dust0_RHO"] = Quantity2D(
-                "Dust0_RHO", r"$\rho_\text{dust}$"
+                "Dust0_RHO", r"$\rho_\text{dust}$", "Vp"
             )
             self.quantities2D["Dust0_VX1"] = Quantity2D(
-                "Dust0_VX1", r"$v_r^\text{dust}$"
+                "Dust0_VX1", r"$v_r^\text{dust}$", "Vp"
             )
             self.quantities2D["Dust0_VX2"] = Quantity2D(
-                "Dust0_VX2", r"$v_\theta^\text{dust}$"
+                "Dust0_VX2", r"$v_\theta^\text{dust}$", "Vp"
             )
             self.quantities2D["Dust0_VX3"] = Quantity2D(
-                "Dust0_VX3", r"$v_\phi^\text{dust}$"
+                "Dust0_VX3", r"$v_\phi^\text{dust}$", "Vp"
             )
+
+        self.StreamLines = {
+            "Bp": StreamLinesData("Bp", r"$B_\text{p}$"),
+            "Vp": StreamLinesData("Vp", r"$V_\text{p}$"),
+        }
 
         for i, qty in enumerate(self.quantities2D.keys()):
             row = i % 3
@@ -413,14 +379,7 @@ class RUN:
             vtk = readVTK(self.data_info["slice1"].test_file, geometry="spherical")
             self.RLine = vtk.r
             self.ThetaLine = vtk.theta
-            # self.Rline = self.Rline[self.zoom_mask]
-            # self.ThetaLine = self.ThetaLine[self.zoom_mask]
             self.R, self.Theta = np.meshgrid(self.RLine, self.ThetaLine)
-            # self.R = np.where(self.mask, self.R, np.nan)
-            # self.Theta = np.where(self.mask, self.R, np.nan)
-
-            # self.zoom_mask = self.Rline < 10
-            # print(self.R.shape)
 
             self.X = self.R * np.sin(self.Theta)
             self.Z = self.R * np.cos(self.Theta)
@@ -429,10 +388,10 @@ class RUN:
                 self.mask = self.X < zoom
             else:
                 self.mask = (
-                    (self.X < zoom)
-                    & (np.abs(self.Z) < zoom)
-                    & (np.abs(np.pi / 2 - self.Theta) > np.pi / 12)
+                    (self.X < zoom) & (np.abs(self.Z) < zoom)
+                    # & (np.abs(np.pi / 2 - self.Theta) > np.pi / 12)
                 )
+            self.xmin = 0
             self.xmax = np.max(np.where(self.mask, self.X, 0))
             self.ymax = np.max(np.where(self.mask, self.Z, 0))
             self.ymin = np.min(np.where(self.mask, self.Z, 0))
@@ -574,7 +533,7 @@ class RUN:
         # print(np.shape(all_bounds))
         all_bounds = np.array(all_bounds)
         bounds = {}
-        if len(bounds) == 0:
+        if len(all_bounds) == 0:
             return bounds
         for field in fields:
             i = mapfields_indexes[field]
@@ -585,7 +544,8 @@ class RUN:
         return bounds
 
     def slice_to_png(self, slice1_path):
-        rows, columns = 3, 5
+        rows = 3
+        columns = int(np.ceil(len(self.quantities2D) / rows))
         cbars = np.full((rows, columns), None)
         fig, axs = plt.subplots(rows, columns, figsize=(4 * columns, 16))
         if do_zoom:
@@ -611,48 +571,23 @@ class RUN:
 
         self.annotateInputs(axs)
 
-        for qty in self.quantities2D.keys():
-            self.quantities2D[qty].set_data(V.data[qty])
-
         if self.doStreamLines:
-            (x_coords, z_coords, Bx_uni, Bz_uni) = get_streamplot_data(
-                self.RLine, self.ThetaLine, V.data["Bx"], V.data["Bz"]
-            )
-            (v_xpoints, v_zpoints, vx_uni, vz_uni) = get_streamplot_data(
-                self.RLine, self.ThetaLine, V.data["vx"], V.data["vz"]
-            )
-            for qty in ["BX1", "BX2", "BX3"]:
-                self.quantities2D[qty].set_streamline_toshow(
-                    x_coords,
-                    z_coords,
-                    Bx_uni,
-                    Bz_uni,
-                    streamline_name=r"$B_p$",
+            self.StreamLines["Bp"].set_data(
+                *get_streamplot_data(
+                    self.RLine, self.ThetaLine, V.data["Bx"], V.data["Bz"], zoom
                 )
-            for qty in [
-                "VX1",
-                "VX2",
-                "VX3",
-                "RHO",
-                "cs",
-                "Mach_p",
-                "Dust0_RHO",
-                "Dust0_VX1",
-                "Dust0_VX2",
-                "Dust0_VX3",
-            ]:
-                self.quantities2D[qty].set_streamline_toshow(
-                    x_coords,
-                    z_coords,
-                    vx_uni,
-                    vz_uni,
-                    streamline_name=r"$v_p$",
+            )
+            self.StreamLines["Vp"].set_data(
+                *get_streamplot_data(
+                    self.RLine, self.ThetaLine, V.data["vx"], V.data["vz"], zoom
                 )
+            )
 
         for i, qty in enumerate(self.quantities2D.keys()):
             qtyInfo = self.quantities2D[qty]
             data = V.data[qty]
             ax = axs[*qtyInfo.coords]
+            streamline = qtyInfo.streamline
             # print(qty, qtyInfo.bounds[1])
             if None in qtyInfo.bounds:
                 vmin, vmax = np.nanmin(data), np.nanmax(data)
@@ -664,6 +599,10 @@ class RUN:
             elif qtyInfo.norm == "log":
                 vmin = vmin if vmin > 0 else 1e-9
                 norm = LogNorm(vmin=vmin, vmax=vmax)
+            elif qtyInfo.norm == "TwoSlopeNorm":
+                vmin = vmin if vmin < 0 else -1e-7
+                # print(vmin, vmax)
+                norm = TwoSlopeNorm(vcenter=0, vmin=vmin, vmax=vmax)
 
             else:
                 vmin, vmax = qtyInfo.bounds
@@ -678,12 +617,12 @@ class RUN:
                 # rasterized=True,
             )
 
-            if self.doStreamLines and qtyInfo.show_streamlines:
+            if self.doStreamLines and streamline is not None:
                 ax.streamplot(
-                    qtyInfo.xUni,
-                    qtyInfo.yUni,
-                    qtyInfo.UxUni,
-                    qtyInfo.UyUni,
+                    self.StreamLines[streamline].X,
+                    self.StreamLines[streamline].Z,
+                    self.StreamLines[streamline].dataX,
+                    self.StreamLines[streamline].dataZ,
                     density=density_streamline,
                     linewidth=lw_streamline,
                     arrowstyle=arrowstyle_streamline,
@@ -701,13 +640,13 @@ class RUN:
             cbars[*qtyInfo.coords] = fig.colorbar(map, ax=ax, label=qtyInfo.name)
             ax.set_aspect("equal", adjustable="box")
             ax.set_xlabel(r"$x$")
-            ax.set_xlim(None, self.xmax)
+            ax.set_xlim(self.xmin, self.xmax)
             ax.set_ylim(self.ymin, self.ymax)
             if qtyInfo.coords[1] == 0:
                 ax.set_ylabel(r"$z$")
             title = qtyInfo.name
             if self.doStreamLines and qtyInfo.show_streamlines:
-                title = qtyInfo.streamline_name
+                title = self.StreamLines[streamline].name
             ax.set_title(title)
 
         Mach_pInfo = self.quantities2D["Mach_p"]
@@ -722,10 +661,13 @@ class RUN:
         )
         cbars[*qtyInfo.coords].add_lines(level0)
 
+        for ii in range(i + 1, len(axs.flat)):
+            axs.flat[ii].remove()
+
         slice1_name = os.path.basename(slice1_path)
 
         slice1_png_path = self.slice1_png_pattern.replace("*", f"{slice1_name[:-4]}")
-        fig.savefig(slice1_png_path, dpi=200)
+        fig.savefig(slice1_png_path, dpi=300)
         plt.close(fig)
         print(f"[OK] {slice1_png_path}")
 
@@ -782,6 +724,7 @@ class RUN:
                     quantities_tobound,
                 )
                 [print(f"{key}: {all_bounds[key]}") for key in all_bounds]
+            print(all_bounds)
             for qt in all_quantities:
                 if qt in config and "range" in config[qt]:
                     self.quantities2D[qt].set_bounds(config[qt]["range"])
@@ -824,7 +767,7 @@ class RUN:
 
 
 def do_task(task):
-    PathToProject = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyWind"
+    PathToProject = "/home/dp316/dp316/dc-fang1/IdefixRuns/AOWind"
 
     run = RUN(PathToProject, task, end=1)
     run.plot_slice(jump_to_movie=False)
@@ -832,7 +775,8 @@ def do_task(task):
 
 
 if __name__ == "__main__":
-    tasks = ["AODw_src"]
+    tasks = ["AOw_Rm10_1536x1024"]
+    # tasks = ["AOw_Rm10_smaller_1000x1024", "AOw_Rm10_smaller_1000xlesstheta"]
     # if sequential:
     for task in tasks:
         count = 0

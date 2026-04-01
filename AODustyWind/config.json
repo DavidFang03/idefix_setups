@@ -19,10 +19,8 @@
             ]
         },
         "VX1": {
-            "range": [
-                -0.5,
-                2
-            ]
+            "norm": "TwoSlopeNorm",
+            "cmap": "RdBu_r"
         },
         "VX2": {
             "range": [

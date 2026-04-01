@@ -3,22 +3,38 @@
 use strict;
 use warnings;
 
-# The directory where calculations are run
-my $IDEFIX_DIR="/home/dp316/dp316/dc-fang1/myidefix";
-# my $SETUP_DIR="/home/dp316/dp316/dc-fang1/myidefix/david/OhmicWind";
-# my $outdir = "/home/dp316/dp316/dc-fang1/outputs/OhmicWind/";
-my $folder_name = "AOWind";
-my $folder_path = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
-my $indir = $folder_path."inputs/";
-my $time   = "00:15:00";
-my $nodes = "1";
-my $gres = "gpu:4";
-my $ntasks_per_node= "4";
-my $IDEFIX_EXE=$folder_path."setup/idefix";
-my $options = "-restart -dec 4 1";
-my $name = "AOw";
+# defining subroutine
+sub format_time 
+{
+    # passing argument    
+    my $minutes = $_[0];
+    my $left_minutes = $minutes % 60;
+    my $hours = int($minutes / 60);
+    my $slurm_format = sprintf("%02d:%02d:00", $hours, $left_minutes);
+    my $idefix_format = $minutes / 60;
+    my %time = ( 
+        slurm => $slurm_format,
+        idefix => $idefix_format
+        );
+    return %time;
+}
 
-my @mysubnames = ("Rm10_1536x1024");
+my $minutes         = 240;
+
+my %time_results    = format_time($minutes);
+my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/myidefix";                            # The directory where calculations are run
+my $folder_name     = "AOWind";
+my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
+my $indir           = $folder_path."inputs/";
+my $time            = $time_results{slurm};
+my $nodes           = "1";
+my $gres            = "gpu:4";
+my $ntasks_per_node = "4";
+my $IDEFIX_EXE      = $folder_path."setup/idefix";
+my $options         = "-restart -dec 4 1";
+my $name            = "AOw";
+
+my @mysubnames = ("Rm10_smaller_1000xlesstheta");
 # my @myRm = (1);
 # my @myetab0 = (1000);
 
@@ -26,22 +42,23 @@ my @indexes = (0);
 
 # `mkdir -p $indir`;
 for my $index (@indexes) {
-print $index;
+print $index."\n";
 my $stringdx_1 = $name."_".$mysubnames[$index]; #OW_test
 my $outputs_path_1 = $folder_path."outputs/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
 my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
 `mkdir -p $vtksdir1`;
 
 ##################### .ini file #####################
+my $idefix_limit = $time_results{idefix} * 0.99;
 `mkdir -p $indir`;
 my $inifile = $indir.$stringdx_1.".ini";
 open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
-X1-grid    1  1.0  1536  l   100.0
-# X2-grid    3  0.0  64   s+  1.28   96  u  1.861592653589  64  s-  3.141592653589793
-X2-grid    1  0.0  1024  u  3.141592653589793
+X1-grid    1  1.0  1000  l   20.0
+X2-grid    3  0.0  417   u  1.28   96  u  1.861592653589  417  u  3.141592653589793
+# X2-grid    1  0.0  1024  u  3.141592653589793
 
 [TimeIntegrator]
 CFL            0.9
@@ -49,7 +66,7 @@ tstop          10000000.0
 # tstop            1000.0
 first_dt       1.e-6
 nstages        2
-max_runtime    0.24
+max_runtime    $idefix_limit
 
 [Hydro]
 solver       hlld
@@ -126,12 +143,6 @@ module load openmpi/4.1.5-cuda12.3
 
 export OMP_NUM_THREADS=1
 export OMP_PLACES=cores
-
-# These will need to be changed to match the actual application you are running
-# application="./idefix"
-# Need to change the dump file requirement later
-# options="-dec 1 1 4"
-# options="-restart -dec 1 1 4"
 
 srun --nodes=$nodes --ntasks-per-node=$ntasks_per_node \\
      --hint=nomultithread  --distribution=block:block \\

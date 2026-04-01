@@ -803,7 +803,7 @@ def do_task(task):
 
 
 if __name__ == "__main__":
-    tasks = ["AOw_src"]
+    tasks = ["AOw_Rm10_1536x1024"]
     # if sequential:
     for task in tasks:
         count = 0
