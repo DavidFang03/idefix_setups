@@ -8,12 +8,15 @@ from multiprocessing import Pool
 
 
 folder1_pattern = "/home/dp316/dp316/dc-fang1/IdefixRuns/AOWind/frames/AOw_Rm10_smaller_1000x1024/global/data*.png"
-folder2_pattern = "/home/dp316/dp316/dc-fang1/IdefixRuns/AOWind/frames/AOw_Rm10_1536x1024/global/zoom*.png"
+folder2_pattern = "/home/dp316/dp316/dc-fang1/IdefixRuns/AOWind/frames/AOw_Rm10_smaller_1000xlesstheta/global/data*.png"
 
-sidebyside_name = "100vs20"
+sidebyside_name = "theta_richvspoor"
 outfolder_path = (
     Path("/home/dp316/dp316/dc-fang1/IdefixRuns/sidebyside") / sidebyside_name
 )
+
+skip_to_movie = False
+
 try:
     os.makedirs(outfolder_path / "frames")
 except:
@@ -21,6 +24,9 @@ except:
 
 list1 = sorted(glob.glob(folder1_pattern))
 list2 = sorted(glob.glob(folder2_pattern))
+minlen = min(len(list1), len(list2))
+if minlen == 0:
+    raise Exception("oula")
 
 
 def sidebyside(ii):
@@ -33,15 +39,14 @@ def sidebyside(ii):
 
     ax1.imshow(img1)
     ax2.imshow(img2)
-    fig.savefig(outfolder_path / f"{ii:04}.png", dpi=300)
+    fig.savefig(outfolder_path / "frames" / f"{ii:04}.png", dpi=300)
     plt.close(fig)
     print(f"So far so good {ii:<4}")
 
 
-skip_to_movie = True
 if not skip_to_movie:
     with Pool(16) as pool:
-        pool.map(sidebyside, range(min(len(list1), len(list2))))
+        pool.map(sidebyside, range(minlen))
 
 fps = 10
 pattern_png = f"{outfolder_path / '*.png'}"

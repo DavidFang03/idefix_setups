@@ -14,11 +14,15 @@
         },
         "BX3": {
             "range": [
-                -1e-4,
-                1e-4
+                -1e-3,
+                1e-3
             ]
         },
         "VX1": {
+            "norm": "TwoSlopeNorm",
+            "cmap": "RdBu_r"
+        },
+        "Dust0_VX1": {
             "norm": "TwoSlopeNorm",
             "cmap": "RdBu_r"
         },
@@ -56,12 +60,6 @@
         },
         "Am": {
             "cmap": "inferno"
-        },
-        "Dust0_VX1": {
-            "range": [
-                -0.5,
-                2
-            ]
         },
         "Dust0_VX2": {
             "range": [

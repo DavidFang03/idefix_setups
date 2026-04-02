@@ -13,9 +13,16 @@ import ffmpeg
 from scipy.interpolate import RegularGridInterpolator
 import json
 from matplotlib.colors import LogNorm, Normalize, TwoSlopeNorm
+from matplotlib.ticker import FuncFormatter
 
 with open("/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyWind/config.json") as f:
     configs = json.load(f)
+
+
+def fmt(x, pos):
+    a, b = "{:.2e}".format(x).split("e")
+    b = int(b)
+    return r"${} \times 10^{{{}}}$".format(a, b)
 
 
 def process_configs(configs):
@@ -29,7 +36,7 @@ configs = process_configs(configs)
 
 count = 0
 
-do_zoom = True
+do_zoom = False
 if do_zoom:
     zoom = 20
 
@@ -39,12 +46,19 @@ else:
 
 
 plt.style.use("dark_background")
+# plt.rcParams.update(
+#     {
+#         # "text.usetex": True,
+#         "text.latex.preamble": r"\usepackage{xcolor}"
+#     }
+# )
 plt.rcParams["hatch.color"] = "gray"
 plt.rcParams["hatch.linewidth"] = 0.5
 
 test_first_run = False
 sequential = True
-bounded = True
+bounded = False
+unbounded = True
 if test_first_run:
     run_movie = False
     sequential = True  # safety guard
@@ -137,11 +151,14 @@ class Quantity1D:
 
 
 class Quantity2D:
-    def __init__(self, key, name, streamline=None):
+    def __init__(self, key, name, streamline=None, plot_coords=None):
         self.key = key
         self.name = name
-        self.show_streamlines = False
         self.streamline = streamline
+        self.show_streamlines = True
+
+        if plot_coords is not None:
+            self.set_plot_coords(*plot_coords)
 
     def set_data(self, data):
         self.data = data
@@ -227,9 +244,10 @@ def get_streamplot_data(
 
 
 class StreamLinesData:
-    def __init__(self, name, title=None):
+    def __init__(self, name, color, title=None):
         self.name = name
         self.title = name if title is None else title
+        self.color = color
 
     def set_data(self, X, Z, dataX, dataZ):
         self.X = X
@@ -308,45 +326,46 @@ class RUN:
         )
 
         self.quantities2D = {
-            "BX1": Quantity2D("BX1", r"$B_r$", "Bp"),
-            "BX2": Quantity2D("BX2", r"$B_\theta$", "Bp"),
-            "BX3": Quantity2D("BX3", r"$B_\phi$", "Bp"),
-            "VX1": Quantity2D("VX1", r"$v_r$", "Vp"),
-            "VX2": Quantity2D("VX2", r"$v_\theta$", "Vp"),
-            "VX3": Quantity2D("VX3", r"$v_\phi$", "Vp"),
-            "RHO": Quantity2D("RHO", r"$\rho$", "Vp"),
-            "cs": Quantity2D("cs", r"$c_s$", "Vp"),
-            "Mach_p": Quantity2D("Mach_p", r"$\text{Mach}_\text{p}$", "Vp"),
-            "eta": Quantity2D("eta", r"$\eta_\text{O}$", "Vp"),
-            "Am": Quantity2D("Am", r"$\text{Am}$", "Vp"),
+            "eta": Quantity2D("eta", r"$\eta_\text{O}$", "Vp", plot_coords=[0, 0]),
+            "Am": Quantity2D("Am", r"$\text{Am}$", "Vp", plot_coords=[1, 0]),
+            # "St": Quantity2D("St", r"$\text{St}$", "Vp", plot_coords=[2, 0]),
+            "BX1": Quantity2D("BX1", r"$B_r$", "Bp", plot_coords=[0, 1]),
+            "BX2": Quantity2D("BX2", r"$B_\theta$", "Bp", plot_coords=[0, 2]),
+            "BX3": Quantity2D("BX3", r"$B_\phi$", "Bp", plot_coords=[0, 3]),
+            "VX1": Quantity2D("VX1", r"$v_r$", "Vp", plot_coords=[1, 1]),
+            "VX2": Quantity2D("VX2", r"$v_\theta$", "Vp", plot_coords=[1, 2]),
+            "VX3": Quantity2D("VX3", r"$v_\phi$", "Vp", plot_coords=[1, 3]),
+            "cs": Quantity2D("cs", r"$c_s$", "Vp", plot_coords=[0, 4]),
+            "Mach_p": Quantity2D(
+                "Mach_p", r"$\text{Mach}_\text{p}$", "Vp", plot_coords=[0, 5]
+            ),
+            "RHO": Quantity2D("RHO", r"$\rho$", "Vp", plot_coords=[1, 4]),
             # "Rm": Quantity2D("Rm", r"$\text{R}_\text{m}$", "Vp"),
         }
 
         self.dust = False
         self.print_available_quantities()
         if self.dust:
-            self.quantities2D["Dust0_RHO"] = Quantity2D(
-                "Dust0_RHO", r"$\rho_\text{dust}$", "Vp"
-            )
             self.quantities2D["Dust0_VX1"] = Quantity2D(
-                "Dust0_VX1", r"$v_r^\text{dust}$", "Vp"
+                "Dust0_VX1", r"$v_r^\text{dust}$", "VpDust", plot_coords=[2, 1]
             )
             self.quantities2D["Dust0_VX2"] = Quantity2D(
-                "Dust0_VX2", r"$v_\theta^\text{dust}$", "Vp"
+                "Dust0_VX2", r"$v_\theta^\text{dust}$", "VpDust", plot_coords=[2, 2]
             )
             self.quantities2D["Dust0_VX3"] = Quantity2D(
-                "Dust0_VX3", r"$v_\phi^\text{dust}$", "Vp"
+                "Dust0_VX3", r"$v_\phi^\text{dust}$", "VpDust", plot_coords=[2, 3]
+            )
+            self.quantities2D["Dust0_RHO"] = Quantity2D(
+                "Dust0_RHO", r"$\rho_\text{dust}$", "VpDust", plot_coords=[2, 4]
             )
 
         self.StreamLines = {
-            "Bp": StreamLinesData("Bp", r"$B_\text{p}$"),
-            "Vp": StreamLinesData("Vp", r"$V_\text{p}$"),
+            "Bp": StreamLinesData("Bp", title=r"$\vec B_\text{p}$", color="#ccd5ae"),
+            "Vp": StreamLinesData("Vp", title=r"$\vec V_\text{p}$", color="#adc178"),
+            "VpDust": StreamLinesData(
+                "VpDust", title=r"$\vec V_\text{p}^\text{dust}$", color="#dde5b6"
+            ),
         }
-
-        for i, qty in enumerate(self.quantities2D.keys()):
-            row = i % 3
-            column = i // 3
-            self.quantities2D[qty].set_plot_coords(row, column)
 
         # we must create
         # ({project}/frames/{RunName})
@@ -439,7 +458,7 @@ class RUN:
         self.annotateInputs(axs)
 
         image_path = self.analysisFrame_path
-        fig.savefig(image_path)
+        fig.savefig(image_path, use="pgf")
         print(f"[OK] {image_path}")
 
     def processVTK(self, V):
@@ -459,6 +478,8 @@ class RUN:
         vr = V.data["VX1"]
         vtheta = V.data["VX2"]
         vphi = V.data["VX3"]
+        vrDust = V.data["Dust0_VX1"]
+        vthetaDust = V.data["Dust0_VX2"]
 
         V.data["Bx"] = np.sin(Theta) * Br + np.cos(Theta) * Btheta
         V.data["Bz"] = np.cos(Theta) * Br - np.sin(Theta) * Btheta
@@ -473,6 +494,10 @@ class RUN:
             np.sqrt(V.data["vx"] ** 2 + V.data["vz"] ** 2),
             V.data["cs"],
         )
+        if self.dust:
+            V.data["vxDust"] = np.sin(Theta) * vrDust + np.cos(Theta) * vthetaDust
+            V.data["vzDust"] = np.cos(Theta) * vrDust - np.sin(Theta) * vthetaDust
+            V.data["vy"] = vphi
 
         # Reynolds number
         # X = self.X
@@ -545,7 +570,7 @@ class RUN:
 
     def slice_to_png(self, slice1_path):
         rows = 3
-        columns = int(np.ceil(len(self.quantities2D) / rows))
+        columns = max([qtyInfo.coords[1] for qtyInfo in self.quantities2D.values()]) + 1
         cbars = np.full((rows, columns), None)
         fig, axs = plt.subplots(rows, columns, figsize=(4 * columns, 16))
         if do_zoom:
@@ -574,33 +599,52 @@ class RUN:
         if self.doStreamLines:
             self.StreamLines["Bp"].set_data(
                 *get_streamplot_data(
-                    self.RLine, self.ThetaLine, V.data["Bx"], V.data["Bz"], zoom
+                    self.RLine, self.ThetaLine, V.data["Bx"], V.data["Bz"], self.xmax
                 )
             )
             self.StreamLines["Vp"].set_data(
                 *get_streamplot_data(
-                    self.RLine, self.ThetaLine, V.data["vx"], V.data["vz"], zoom
+                    self.RLine, self.ThetaLine, V.data["vx"], V.data["vz"], self.xmax
                 )
             )
+            if self.dust:
+                self.StreamLines["VpDust"].set_data(
+                    *get_streamplot_data(
+                        self.RLine,
+                        self.ThetaLine,
+                        V.data["vxDust"],
+                        V.data["vzDust"],
+                        self.xmax,
+                    )
+                )
 
+        unusedAxs = [[i, j] for i in range(rows) for j in range(columns)]
         for i, qty in enumerate(self.quantities2D.keys()):
             qtyInfo = self.quantities2D[qty]
             data = V.data[qty]
             ax = axs[*qtyInfo.coords]
+            unusedAxs.remove(qtyInfo.coords)
             streamline = qtyInfo.streamline
             # print(qty, qtyInfo.bounds[1])
             if None in qtyInfo.bounds:
                 vmin, vmax = np.nanmin(data), np.nanmax(data)
             else:
                 vmin, vmax = qtyInfo.bounds
+            if unbounded:
+                vmin, vmax = np.nanmin(data), np.nanmax(data)
 
-            if qtyInfo.norm is None:
-                norm = Normalize(vmin=vmin, vmax=vmax)
-            elif qtyInfo.norm == "log":
+            cbar_format = FuncFormatter(fmt)
+            norm = Normalize(vmin=vmin, vmax=vmax)
+
+            if qtyInfo.norm == "log":
                 vmin = vmin if vmin > 0 else 1e-9
+                vmax = vmax if vmax > 0 else 1e-8
+                # print(vmin, vmax)
                 norm = LogNorm(vmin=vmin, vmax=vmax)
-            elif qtyInfo.norm == "TwoSlopeNorm":
+                cbar_format = None
+            elif qtyInfo.norm == "TwoSlopeNorm" and not unbounded:
                 vmin = vmin if vmin < 0 else -1e-7
+                vmax = vmax if vmax > 0 else 1e-7
                 # print(vmin, vmax)
                 norm = TwoSlopeNorm(vcenter=0, vmin=vmin, vmax=vmax)
 
@@ -626,6 +670,7 @@ class RUN:
                     density=density_streamline,
                     linewidth=lw_streamline,
                     arrowstyle=arrowstyle_streamline,
+                    color=self.StreamLines[streamline].color,
                 )
             if do_zoom:
                 ax.contourf(
@@ -637,17 +682,27 @@ class RUN:
                     colors="none",
                 )
 
-            cbars[*qtyInfo.coords] = fig.colorbar(map, ax=ax, label=qtyInfo.name)
+            cbars[*qtyInfo.coords] = fig.colorbar(map, ax=ax, format=cbar_format)
+            cbars[*qtyInfo.coords].ax.set_title(qtyInfo.name)
             ax.set_aspect("equal", adjustable="box")
             ax.set_xlabel(r"$x$")
             ax.set_xlim(self.xmin, self.xmax)
             ax.set_ylim(self.ymin, self.ymax)
+
             if qtyInfo.coords[1] == 0:
                 ax.set_ylabel(r"$z$")
             title = qtyInfo.name
             if self.doStreamLines and qtyInfo.show_streamlines:
-                title = self.StreamLines[streamline].name
-            ax.set_title(title)
+                title = rf"{self.StreamLines[streamline].title} $\nearrow$"
+                # title = (
+                #     rf"{self.StreamLines[streamline].name} $\textcolor[HTML]"
+                #     + "{"
+                #     + self.StreamLines[streamline].color[1:]
+                #     + "}{"
+                #     + r"\nearrow$"
+                #     + "}"
+                # )
+            ax.set_title(title, color=self.StreamLines[streamline].color)
 
         Mach_pInfo = self.quantities2D["Mach_p"]
         level0 = axs[*Mach_pInfo.coords].contour(
@@ -657,12 +712,12 @@ class RUN:
             [1],
             alpha=0.5,
             colors=["green"],
-            linewidths=[1],
+            linewidths=[1.5],
         )
         cbars[*qtyInfo.coords].add_lines(level0)
 
-        for ii in range(i + 1, len(axs.flat)):
-            axs.flat[ii].remove()
+        for coords in unusedAxs:
+            axs[*coords].remove()
 
         slice1_name = os.path.basename(slice1_path)
 
@@ -767,7 +822,7 @@ class RUN:
 
 
 def do_task(task):
-    PathToProject = "/home/dp316/dp316/dc-fang1/IdefixRuns/AOWind"
+    PathToProject = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyWind"
 
     run = RUN(PathToProject, task, end=1)
     run.plot_slice(jump_to_movie=False)
@@ -775,7 +830,7 @@ def do_task(task):
 
 
 if __name__ == "__main__":
-    tasks = ["AOw_Rm10_1536x1024"]
+    tasks = ["AODw_src", "AODw_src_nodragfeedback", "AODw_src_nodragfeedback_epstein"]
     # tasks = ["AOw_Rm10_smaller_1000x1024", "AOw_Rm10_smaller_1000xlesstheta"]
     # if sequential:
     for task in tasks:
