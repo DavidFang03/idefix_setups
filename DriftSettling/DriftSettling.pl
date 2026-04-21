@@ -4,26 +4,26 @@ use strict;
 use warnings;
 
 # defining subroutine
-sub format_time 
+sub format_time
 {
-    # passing argument    
+    # passing argument
     my $minutes = $_[0];
     my $left_minutes = $minutes % 60;
     my $hours = int($minutes / 60);
     my $slurm_format = sprintf("%02d:%02d:00", $hours, $left_minutes);
     my $idefix_format = $minutes / 60;
-    my %time = ( 
+    my %time = (
         slurm => $slurm_format,
         idefix => $idefix_format
         );
     return %time;
 }
 
-my $minutes         = 4*60;
+my $minutes         = 0.5*60;
 
 my %time_results    = format_time($minutes);
 my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/myidefix";                            # The directory where calculations are run
-my $folder_name     = "AODustyWind";
+my $folder_name     = "DriftSettling";
 my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
@@ -32,19 +32,15 @@ my $nodes           = "1";
 my $gres            = "gpu:4";
 my $ntasks_per_node = "4";
 my $IDEFIX_EXE      = $folder_path."setup/idefix";
-my $options         = "-restart -dec 4 1";
-my $name            = "AODw";
+my $options         = "-dec 4 1";
+my $name            = "DS";
 
-my @mysubnames = ("tau1e-3", "tau1e-5", "tau1e-7");
-my @taus = (1e-3, 1e-5, 1e-7);
-# my @myRm = (1);
-# my @myetab0 = (1000);
+my @mysubnames = ("test_reflective_alpha1e-2");
 
-my @indexes = (0, 1,2);
+my @indexes = (0);
 
 # `mkdir -p $indir`;
 for my $index (@indexes) {
-my $tau = $taus[$index];
 print $index."\n";
 my $stringdx_1 = $name."_".$mysubnames[$index]; #OW_test
 my $outputs_path_1 = $folder_path."outputs/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
@@ -60,7 +56,7 @@ print INI <<ENDOFINI;
 ##
 [Grid]
 X1-grid    1  1.0  1000  l   20.0
-X2-grid    3  0.0  417   u  1.28   96  u  1.861592653589  417  u  3.141592653589793
+X2-grid    1  1.0471975511965976 512 u 2.0943951023931953 # [pi/3, 2pi/3]
 # X2-grid    1  0.0  1024  u  3.141592653589793
 
 [TimeIntegrator]
@@ -72,16 +68,16 @@ nstages        2
 max_runtime    $idefix_limit
 
 [Hydro]
-solver       hlld
-ambipolar    explicit  userdef
-resistivity  explicit  userdef
-gamma        1.0001
+solver       hllc
+csiso         userdef
+viscosity   rkl userdef
+alpha         1.0e-2
 
-[Dust]
-nSpecies         1
-drag             tau  $tau
-drag_feedback    false
-DustToGas        0.01
+# [Dust]
+# nSpecies         3
+# drag              tau  1 0.2 0.04
+# drag_feedback    false
+# DustToGas        0.01
 # gamma_i = 1/(rho beta_i) where beta_i is the given value
 
 [Gravity]
@@ -89,35 +85,28 @@ potential    central
 Mcentral     1.0
 
 [Boundary]
-X1-beg    userdef
-X1-end    userdef
-X2-beg    axis
-X2-end    axis
+X1-beg    outflow
+X1-end    outflow
+X2-beg    reflective
+X2-end    reflective
 
 [Setup]
-Rm0                    10.0
-etab0                  1.0
-epsilon                0.05
-beta                   1000
-# beta->10000?
-epsilonTop             0.3
-Hideal                 5.0
-Am                     1.0
-densityFloor           1.0e-7
-transitionSmoothing    0.5
+sigma0        0.125
+sigmaSlope    0.5
+csSlope       1.0
+h0            0.05
 
 [Output]
-uservar    eta    Am    InvDt
-vtk        2
+vtk        1
 dmp_dir    $outputs_path_1
 dmp        40
 log        1000
 vtk_dir    $vtksdir1
-dat_path   $outputs_path_1/timevol.dat
-analysis   1
+# dat_path   $outputs_path_1/timevol.dat
+# analysis   1
 
 # [Output]
-# 
+#
 # dmp        100
 # vtk        3.0
 # vtk_slice1 1.0  1  0.0  cut

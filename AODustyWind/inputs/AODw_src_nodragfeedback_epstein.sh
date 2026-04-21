@@ -7,7 +7,7 @@
 #SBATCH --qos=dev
 
 # Request right number of full nodes (48 cores by node for A100-80 GPU nodes))
-#SBATCH --nodes=2
+#SBATCH --nodes=1
 #SBATCH --ntasks-per-node=4
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=1
@@ -23,7 +23,7 @@ module load openmpi/4.1.5-cuda12.3
 export OMP_NUM_THREADS=1
 export OMP_PLACES=cores
 
-srun --nodes=2 --ntasks-per-node=4 \
+srun --nodes=1 --ntasks-per-node=4 \
      --hint=nomultithread  --distribution=block:block \
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \
-     /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyWind/setup/idefix -restart -dec 4 2 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyWind/inputs/AODw_src_nodragfeedback_epstein.ini
+     /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyWind/setup/idefix -dec 4 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyWind/inputs/AODw_src_nodragfeedback_epstein.ini

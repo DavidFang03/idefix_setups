@@ -32,6 +32,22 @@ def process_configs(configs):
     return configs
 
 
+def averageTheta(R, Theta, Values):
+    """
+    R and Theta must be lines.
+    I assume log for R and uniform on theta (on the edges at least)
+    """
+    # dr = np.diff(R)  # log
+    # dr_r = dr / R[:-1]
+    # dr = np.append(dr, dr_r[-1] * R[-1])
+    dtheta = np.diff(Theta)  # lin on the edges
+    dtheta = np.append(dtheta, dtheta[-1])
+
+    Rmesh, dthetamesh = np.meshgrid(R, dtheta)
+
+    return np.sum(Values * Rmesh * dthetamesh, axis=1)
+
+
 configs = process_configs(configs)
 
 count = 0
@@ -57,8 +73,8 @@ plt.rcParams["hatch.linewidth"] = 0.5
 
 test_first_run = False
 sequential = True
-bounded = False
-unbounded = True
+bounded = True
+unbounded = False
 if test_first_run:
     run_movie = False
     sequential = True  # safety guard
@@ -137,7 +153,7 @@ class Data_info:
             self.data_test = handle_test_file(self.test_file)
 
 
-class Quantity1D:
+class Scalar:
     def __init__(self, key, symbol, **kwargs):
         scale = kwargs.get("scale", "linear")
         title = kwargs.get("title", symbol)
@@ -148,6 +164,21 @@ class Quantity1D:
 
     def set_data(self, data):
         self.data = data
+
+
+class Field1DwithTime:
+    def __init__(self, key, symbol, index, **kwargs):
+        scale = kwargs.get("scale", "linear")
+        title = kwargs.get("title", symbol)
+        self.key = key
+        self.symbol = symbol
+        self.title = title
+        self.scale = scale
+        self.index = index
+
+    def set_data(self, points, values):
+        self.points = points
+        self.values = values
 
 
 class Quantity2D:
@@ -340,7 +371,9 @@ class RUN:
                 "Mach_p", r"$\text{Mach}_\text{p}$", "Vp", plot_coords=[0, 5]
             ),
             "RHO": Quantity2D("RHO", r"$\rho$", "Vp", plot_coords=[1, 4]),
-            # "Rm": Quantity2D("Rm", r"$\text{R}_\text{m}$", "Vp"),
+            "InvDt": Quantity2D(
+                "InvDt", r"$\mathrm{d}t^{-1}$", "Vp", plot_coords=[2, 0]
+            ),
         }
 
         self.dust = False
@@ -367,6 +400,18 @@ class RUN:
             ),
         }
 
+        # >>>>>>>>> Post Timeseries <<<<<<<<<<<<#
+        self.PostTimeSeries = []  # shape (N_timesteps,N_quantities)
+        self.Scalars = {
+            "divB": Scalar("divB", r"$\mathrm{div} B$", scale="linear"),
+            "mass": Scalar("mass", r"$M$", title="Mass (normalized)", scale="log"),
+        }
+        self.Fields1DwithTime = {}
+        if self.dust:
+            self.Fields1DwithTime = {
+                "Vr_avg": Field1DwithTime("Vr_avg", r"$\overline{v}_R$", index=1),
+            }
+        # self.Scalars["Vr_avg"].set_index(1)
         # we must create
         # ({project}/frames/{RunName})
         # {project}/frames/{RunName}/global
@@ -384,15 +429,15 @@ class RUN:
             except OSError as _:
                 pass
                 subfolder = os.path.basename(path)
-                content = glob.glob(f"{path}/*")
-                user_agree = input(
-                    f"Will overwrite the {subfolder} folder ({len(content)} files) [o/r/n] (overwrite, remove, no)"
-                )
-                if user_agree == "r":
-                    for f in content:
-                        os.remove(f)
-                elif user_agree == "n":
-                    exit()
+                # content = glob.glob(f"{path}/*")
+                # user_agree = input(
+                #     f"Will overwrite the {subfolder} folder ({len(content)} files) [o/r/n] (overwrite, remove, no)"
+                # )
+                # if user_agree == "r":
+                #     for f in content:
+                #         os.remove(f)
+                # elif user_agree == "n":
+                #     exit()
 
         if self.data_info["slice1"].status:
             vtk = readVTK(self.data_info["slice1"].test_file, geometry="spherical")
@@ -439,26 +484,39 @@ class RUN:
         fig.suptitle(self.DataPath)
         fig.subplots_adjust(left=0.1, right=1 - 0.05, top=0.75, hspace=0.3, wspace=0.2)
         a = self.analysis
-        t = a["t"]
-        self.quantities1D = {
-            "divB": Quantity1D("divB", r"$\mathrm{div} B$", scale="linear"),
-            "mass": Quantity1D("mass", r"$M$", title="Mass (normalized)", scale="log"),
-        }
-        for i, timeseries in enumerate(self.quantities1D.keys()):
+        i = 0
+        # t = a["t"]
+
+        # for timeseries in self.Scalars:
+        #     i += 1
+        #     ax = axs[i % 3, i // 3]
+        #     qty1D_info = self.Scalars[timeseries]
+        #     ax.plot(t, a[timeseries], label=qty1D_info.title)
+        #     ax.set_xlabel(r"$t$")
+        #     ax.set_ylabel(qty1D_info.symbol)
+        #     ax.set_yscale(qty1D_info.scale)
+        #     ax.set_title(qty1D_info.title)
+        #     ax.legend()
+        #     ax.grid()
+
+        for key, field in self.Fields1DwithTime.items():
+            i += 1
             ax = axs[i % 3, i // 3]
-            qty1D_info = self.quantities1D[timeseries]
-            ax.plot(t, a[timeseries], label=qty1D_info.title)
+            T, Points = np.meshgrid(self.vtkTimes, field.points)
+            cmesh = ax.pcolormesh(
+                T, Points, np.transpose(field.values), shading="nearest"
+            )
+            cbar = fig.colorbar(cmesh, ax=ax)
+            cbar.ax.set_title(field.title)
             ax.set_xlabel(r"$t$")
-            ax.set_ylabel(qty1D_info.symbol)
-            ax.set_yscale(qty1D_info.scale)
-            ax.set_title(qty1D_info.title)
-            ax.legend()
+            ax.set_ylabel(r"$R$")
+            ax.set_title("Averaged radial velocity")
             ax.grid()
 
         self.annotateInputs(axs)
 
         image_path = self.analysisFrame_path
-        fig.savefig(image_path, use="pgf")
+        fig.savefig(image_path)
         print(f"[OK] {image_path}")
 
     def processVTK(self, V):
@@ -478,8 +536,9 @@ class RUN:
         vr = V.data["VX1"]
         vtheta = V.data["VX2"]
         vphi = V.data["VX3"]
-        vrDust = V.data["Dust0_VX1"]
-        vthetaDust = V.data["Dust0_VX2"]
+        if self.dust:
+            vrDust = V.data["Dust0_VX1"]
+            vthetaDust = V.data["Dust0_VX2"]
 
         V.data["Bx"] = np.sin(Theta) * Br + np.cos(Theta) * Btheta
         V.data["Bz"] = np.cos(Theta) * Br - np.sin(Theta) * Btheta
@@ -497,7 +556,14 @@ class RUN:
         if self.dust:
             V.data["vxDust"] = np.sin(Theta) * vrDust + np.cos(Theta) * vthetaDust
             V.data["vzDust"] = np.cos(Theta) * vrDust - np.sin(Theta) * vthetaDust
-            V.data["vy"] = vphi
+            V.data["Vr_avg"] = averageTheta(
+                self.RLine, self.ThetaLine, V.data["Dust0_VX1"]
+            )
+        V.data["vy"] = vphi
+
+        ## Post Time Series
+        # Vr_avg
+        # V.data["Vr_avg"] = np.average(V.data["VX1"], axis=0)
 
         # Reynolds number
         # X = self.X
@@ -569,162 +635,180 @@ class RUN:
         return bounds
 
     def slice_to_png(self, slice1_path):
-        rows = 3
-        columns = max([qtyInfo.coords[1] for qtyInfo in self.quantities2D.values()]) + 1
-        cbars = np.full((rows, columns), None)
-        fig, axs = plt.subplots(rows, columns, figsize=(4 * columns, 16))
-        if do_zoom:
-            fig.patch.set_linewidth(10)
-            fig.patch.set_edgecolor("cornflowerblue")
-        fig.subplots_adjust(
-            left=0.05,
-            right=1 - 0.05,
-            bottom=0.07,
-            top=0.83,
-            hspace=0.25,
-            wspace=0.02,
-        )
         V = readVTK(slice1_path, geometry=geometry)
-
         X = self.X
         Z = self.Z
-
         self.processVTK(V)
-
         time = V.t[0]
-        fig.suptitle(f"{self.name}\n{slice1_path}\n$t={time:.1e}$")
 
-        self.annotateInputs(axs)
+        if not self.jump_to_analysis:
+            rows = 3
+            columns = (
+                max([qtyInfo.coords[1] for qtyInfo in self.quantities2D.values()]) + 1
+            )
+            cbars = np.full((rows, columns), None)
+            fig, axs = plt.subplots(rows, columns, figsize=(4 * columns, 16))
+            if do_zoom:
+                fig.patch.set_linewidth(10)
+                fig.patch.set_edgecolor("cornflowerblue")
+            fig.subplots_adjust(
+                left=0.05,
+                right=1 - 0.05,
+                bottom=0.07,
+                top=0.83,
+                hspace=0.25,
+                wspace=0.02,
+            )
 
-        if self.doStreamLines:
-            self.StreamLines["Bp"].set_data(
-                *get_streamplot_data(
-                    self.RLine, self.ThetaLine, V.data["Bx"], V.data["Bz"], self.xmax
-                )
-            )
-            self.StreamLines["Vp"].set_data(
-                *get_streamplot_data(
-                    self.RLine, self.ThetaLine, V.data["vx"], V.data["vz"], self.xmax
-                )
-            )
-            if self.dust:
-                self.StreamLines["VpDust"].set_data(
+            fig.suptitle(f"{self.name}\n{slice1_path}\n$t={time:.1e}$")
+
+            self.annotateInputs(axs)
+
+            if self.doStreamLines:
+                self.StreamLines["Bp"].set_data(
                     *get_streamplot_data(
                         self.RLine,
                         self.ThetaLine,
-                        V.data["vxDust"],
-                        V.data["vzDust"],
+                        V.data["Bx"],
+                        V.data["Bz"],
                         self.xmax,
                     )
                 )
-
-        unusedAxs = [[i, j] for i in range(rows) for j in range(columns)]
-        for i, qty in enumerate(self.quantities2D.keys()):
-            qtyInfo = self.quantities2D[qty]
-            data = V.data[qty]
-            ax = axs[*qtyInfo.coords]
-            unusedAxs.remove(qtyInfo.coords)
-            streamline = qtyInfo.streamline
-            # print(qty, qtyInfo.bounds[1])
-            if None in qtyInfo.bounds:
-                vmin, vmax = np.nanmin(data), np.nanmax(data)
-            else:
-                vmin, vmax = qtyInfo.bounds
-            if unbounded:
-                vmin, vmax = np.nanmin(data), np.nanmax(data)
-
-            cbar_format = FuncFormatter(fmt)
-            norm = Normalize(vmin=vmin, vmax=vmax)
-
-            if qtyInfo.norm == "log":
-                vmin = vmin if vmin > 0 else 1e-9
-                vmax = vmax if vmax > 0 else 1e-8
-                # print(vmin, vmax)
-                norm = LogNorm(vmin=vmin, vmax=vmax)
-                cbar_format = None
-            elif qtyInfo.norm == "TwoSlopeNorm" and not unbounded:
-                vmin = vmin if vmin < 0 else -1e-7
-                vmax = vmax if vmax > 0 else 1e-7
-                # print(vmin, vmax)
-                norm = TwoSlopeNorm(vcenter=0, vmin=vmin, vmax=vmax)
-
-            else:
-                vmin, vmax = qtyInfo.bounds
-
-            map = ax.pcolormesh(
-                X,
-                Z,
-                data,
-                cmap=qtyInfo.cmap,
-                norm=norm,
-                # shading="flat",
-                # rasterized=True,
-            )
-
-            if self.doStreamLines and streamline is not None:
-                ax.streamplot(
-                    self.StreamLines[streamline].X,
-                    self.StreamLines[streamline].Z,
-                    self.StreamLines[streamline].dataX,
-                    self.StreamLines[streamline].dataZ,
-                    density=density_streamline,
-                    linewidth=lw_streamline,
-                    arrowstyle=arrowstyle_streamline,
-                    color=self.StreamLines[streamline].color,
+                self.StreamLines["Vp"].set_data(
+                    *get_streamplot_data(
+                        self.RLine,
+                        self.ThetaLine,
+                        V.data["vx"],
+                        V.data["vz"],
+                        self.xmax,
+                    )
                 )
-            if do_zoom:
-                ax.contourf(
+                if self.dust:
+                    self.StreamLines["VpDust"].set_data(
+                        *get_streamplot_data(
+                            self.RLine,
+                            self.ThetaLine,
+                            V.data["vxDust"],
+                            V.data["vzDust"],
+                            self.xmax,
+                        )
+                    )
+
+            unusedAxs = [[i, j] for i in range(rows) for j in range(columns)]
+            for qty, qtyInfo in self.quantities2D.items():
+                data = V.data[qty]
+                ax = axs[*qtyInfo.coords]
+                unusedAxs.remove(qtyInfo.coords)
+                streamline = qtyInfo.streamline
+                # print(qty, qtyInfo.bounds[1])
+                if None in qtyInfo.bounds:
+                    vmin, vmax = np.nanmin(data), np.nanmax(data)
+                else:
+                    vmin, vmax = qtyInfo.bounds
+                if unbounded:
+                    vmin, vmax = np.nanmin(data), np.nanmax(data)
+
+                cbar_format = FuncFormatter(fmt)
+                norm = Normalize(vmin=vmin, vmax=vmax)
+
+                if qtyInfo.norm == "log":
+                    vmin = vmin if vmin > 0 else 1e-9
+                    vmax = vmax if vmax > 0 else 1e-8
+                    # print(vmin, vmax)
+                    norm = LogNorm(vmin=vmin, vmax=vmax)
+                    cbar_format = None
+                elif qtyInfo.norm == "TwoSlopeNorm" and not unbounded:
+                    vmin = vmin if vmin < 0 else -1e-7
+                    vmax = vmax if vmax > 0 else 1e-7
+                    # print(vmin, vmax)
+                    norm = TwoSlopeNorm(vcenter=0, vmin=vmin, vmax=vmax)
+
+                else:
+                    vmin, vmax = qtyInfo.bounds
+
+                cmesh = ax.pcolormesh(
                     X,
                     Z,
-                    np.logical_not(self.mask),
-                    levels=[0.5, 1],
-                    hatches=["////"],
-                    colors="none",
+                    data,
+                    cmap=qtyInfo.cmap,
+                    norm=norm,
+                    # shading="flat",
+                    # rasterized=True,
                 )
 
-            cbars[*qtyInfo.coords] = fig.colorbar(map, ax=ax, format=cbar_format)
-            cbars[*qtyInfo.coords].ax.set_title(qtyInfo.name)
-            ax.set_aspect("equal", adjustable="box")
-            ax.set_xlabel(r"$x$")
-            ax.set_xlim(self.xmin, self.xmax)
-            ax.set_ylim(self.ymin, self.ymax)
+                if self.doStreamLines and streamline is not None:
+                    ax.streamplot(
+                        self.StreamLines[streamline].X,
+                        self.StreamLines[streamline].Z,
+                        self.StreamLines[streamline].dataX,
+                        self.StreamLines[streamline].dataZ,
+                        density=density_streamline,
+                        linewidth=lw_streamline,
+                        arrowstyle=arrowstyle_streamline,
+                        color=self.StreamLines[streamline].color,
+                    )
+                if do_zoom:
+                    ax.contourf(
+                        X,
+                        Z,
+                        np.logical_not(self.mask),
+                        levels=[0.5, 1],
+                        hatches=["////"],
+                        colors="none",
+                    )
 
-            if qtyInfo.coords[1] == 0:
-                ax.set_ylabel(r"$z$")
-            title = qtyInfo.name
-            if self.doStreamLines and qtyInfo.show_streamlines:
-                title = rf"{self.StreamLines[streamline].title} $\nearrow$"
-                # title = (
-                #     rf"{self.StreamLines[streamline].name} $\textcolor[HTML]"
-                #     + "{"
-                #     + self.StreamLines[streamline].color[1:]
-                #     + "}{"
-                #     + r"\nearrow$"
-                #     + "}"
-                # )
-            ax.set_title(title, color=self.StreamLines[streamline].color)
+                cbars[*qtyInfo.coords] = fig.colorbar(cmesh, ax=ax, format=cbar_format)
+                cbars[*qtyInfo.coords].ax.set_title(qtyInfo.name)
+                ax.set_aspect("equal", adjustable="box")
+                ax.set_xlabel(r"$x$")
+                ax.set_xlim(self.xmin, self.xmax)
+                ax.set_ylim(self.ymin, self.ymax)
 
-        Mach_pInfo = self.quantities2D["Mach_p"]
-        level0 = axs[*Mach_pInfo.coords].contour(
-            X,
-            Z,
-            V.data["Mach_p"],
-            [1],
-            alpha=0.5,
-            colors=["green"],
-            linewidths=[1.5],
-        )
-        cbars[*qtyInfo.coords].add_lines(level0)
+                if qtyInfo.coords[1] == 0:
+                    ax.set_ylabel(r"$z$")
+                title = qtyInfo.name
+                if self.doStreamLines and qtyInfo.show_streamlines:
+                    title = rf"{self.StreamLines[streamline].title} $\nearrow$"
+                    # title = (
+                    #     rf"{self.StreamLines[streamline].name} $\textcolor[HTML]"
+                    #     + "{"
+                    #     + self.StreamLines[streamline].color[1:]
+                    #     + "}{"
+                    #     + r"\nearrow$"
+                    #     + "}"
+                    # )
+                ax.set_title(title, color=self.StreamLines[streamline].color)
 
-        for coords in unusedAxs:
-            axs[*coords].remove()
+            Mach_pInfo = self.quantities2D["Mach_p"]
+            level0 = axs[*Mach_pInfo.coords].contour(
+                X,
+                Z,
+                V.data["Mach_p"],
+                [1],
+                alpha=0.5,
+                colors=["green"],
+                linewidths=[1.5],
+            )
+            cbars[*qtyInfo.coords].add_lines(level0)
 
-        slice1_name = os.path.basename(slice1_path)
+            for coords in unusedAxs:
+                axs[*coords].remove()
 
-        slice1_png_path = self.slice1_png_pattern.replace("*", f"{slice1_name[:-4]}")
-        fig.savefig(slice1_png_path, dpi=300)
-        plt.close(fig)
-        print(f"[OK] {slice1_png_path}")
+            slice1_name = os.path.basename(slice1_path)
+
+            slice1_png_path = self.slice1_png_pattern.replace(
+                "*", f"{slice1_name[:-4]}"
+            )
+            fig.savefig(slice1_png_path, dpi=300)
+            plt.close(fig)
+            print(f"[OK] {slice1_png_path}")
+
+        # Post Time Series
+        PostTimeSeries = [None for _ in range(1 + len(self.Fields1DwithTime))]
+        PostTimeSeries[0] = V.t[0]
+        for key, field in self.Fields1DwithTime.items():
+            PostTimeSeries[field.index] = V.data[key]
+        return PostTimeSeries
 
     def formatInputs(self):
         with open(self.iniPath) as ini:
@@ -759,62 +843,79 @@ class RUN:
             fontsize=10,
         )
 
-    def plot_slice(self, jump_to_movie=False):
+    def plot_slice(self, jump_to_movie=False, jump_to_analysis=False):
+        self.jump_to_analysis = jump_to_analysis
 
         if not jump_to_movie:
-            all_quantities = self.quantities2D.keys()
-            config = self.config
-            print("Computing bounds, please wait...")
-            quantities_tobound = [
-                key
-                for key in all_quantities
-                if key not in config or "range" not in config[key]
-            ]
-            print(config)
-            print(quantities_tobound)
-            all_bounds = {}
-            if len(quantities_tobound) > 0:
-                all_bounds = self.get_bounds(
-                    self.slice1_list[min(len(self.slice1_list), 5) :],
-                    quantities_tobound,
-                )
-                [print(f"{key}: {all_bounds[key]}") for key in all_bounds]
-            print(all_bounds)
-            for qt in all_quantities:
-                if qt in config and "range" in config[qt]:
-                    self.quantities2D[qt].set_bounds(config[qt]["range"])
-                elif not self.bounded:
-                    self.quantities2D[qt].set_bounds([None, None])
-                elif qt in all_bounds:
-                    self.quantities2D[qt].set_bounds(all_bounds[qt])
+            if not jump_to_analysis:
+                all_quantities = self.quantities2D.keys()
+                config = self.config
+                print("Computing bounds, please wait...")
+                quantities_tobound = [
+                    key
+                    for key in all_quantities
+                    if key not in config or "range" not in config[key]
+                ]
+                print(config)
+                print(quantities_tobound)
+                all_bounds = {}
+                if len(quantities_tobound) > 0:
+                    all_bounds = self.get_bounds(
+                        self.slice1_list[min(len(self.slice1_list), 5) :],
+                        quantities_tobound,
+                    )
+                    [print(f"{key}: {all_bounds[key]}") for key in all_bounds]
+                print(all_bounds)
+                for qt in all_quantities:
+                    if qt in config and "range" in config[qt]:
+                        self.quantities2D[qt].set_bounds(config[qt]["range"])
+                    elif not self.bounded:
+                        self.quantities2D[qt].set_bounds([None, None])
+                    elif qt in all_bounds:
+                        self.quantities2D[qt].set_bounds(all_bounds[qt])
 
-                else:
-                    self.quantities2D[qt].set_bounds([None, None])
+                    else:
+                        self.quantities2D[qt].set_bounds([None, None])
 
-            for qt in all_quantities:
-                self.quantities2D[qt].set_cmap("berlin")
-                self.quantities2D[qt].set_norm(None)
-                if qt in config:
-                    if "cmap" in config[qt]:
-                        self.quantities2D[qt].set_cmap(config[qt]["cmap"])
-                    if "norm" in config[qt]:
-                        self.quantities2D[qt].set_norm(config[qt]["norm"])
+                for qt in all_quantities:
+                    self.quantities2D[qt].set_cmap("berlin")
+                    self.quantities2D[qt].set_norm(None)
+                    if qt in config:
+                        if "cmap" in config[qt]:
+                            self.quantities2D[qt].set_cmap(config[qt]["cmap"])
+                        if "norm" in config[qt]:
+                            self.quantities2D[qt].set_norm(config[qt]["norm"])
 
-            print("Bounds computed")
-            for qt in self.quantities2D:
-                print(qt, self.quantities2D[qt].bounds)
+                print("Bounds computed")
+                for qt in self.quantities2D:
+                    print(qt, self.quantities2D[qt].bounds)
+
             if test_first_run:
                 for slice1_path in [self.slice1_list[0]]:
                     self.slice_to_png(slice1_path)
             else:
                 if self.parallel:
                     with Pool(16) as pool:
-                        pool.map(self.slice_to_png, self.slice1_list)
+                        Fields1DwithTime_result = pool.map(
+                            self.slice_to_png, self.slice1_list
+                        )
                 else:
+                    Fields1DwithTime_result = []
                     for slice1_path in self.slice1_list:
-                        self.slice_to_png(slice1_path)
+                        result = self.slice_to_png(slice1_path)
+                        Fields1DwithTime_result.append(result)
+                nb_vtkTimes = len(Fields1DwithTime_result)
+                self.vtkTimes = [
+                    Fields1DwithTime_result[i][0] for i in range(nb_vtkTimes)
+                ]
+                for field in self.Fields1DwithTime.values():
+                    values = [
+                        Fields1DwithTime_result[i][field.index]
+                        for i in range(nb_vtkTimes)
+                    ]
+                    field.set_data(points=self.RLine, values=values)
 
-        if run_movie:
+        if run_movie and not jump_to_analysis:
             movie(
                 self.slice1_png_pattern,
                 self.slice1Movie_path,
@@ -825,13 +926,17 @@ def do_task(task):
     PathToProject = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyWind"
 
     run = RUN(PathToProject, task, end=1)
-    run.plot_slice(jump_to_movie=False)
+    run.plot_slice(jump_to_movie=False, jump_to_analysis=False)
     # run.plot_analysis()
 
 
 if __name__ == "__main__":
-    tasks = ["AODw_src", "AODw_src_nodragfeedback", "AODw_src_nodragfeedback_epstein"]
-    # tasks = ["AOw_Rm10_smaller_1000x1024", "AOw_Rm10_smaller_1000xlesstheta"]
+    tasks = ["AODw_tau1e-3"]
+    # tasks = [
+    #     "AOw_Rm10_1536x1024",
+    #     "AOw_Rm10_smaller_1000x1024",
+    #     "AOw_Rm10_smaller_1000xlesstheta",
+    # ]
     # if sequential:
     for task in tasks:
         count = 0

@@ -1,0 +1,8 @@
+#define COMPONENTS 3
+#define DIMENSIONS 3
+
+#define ISOTHERMAL
+
+#define DISABLE_PARTICLE_FEEDBACK
+
+#define GEOMETRY POLAR
