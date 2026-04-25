@@ -152,8 +152,8 @@ void UserdefBoundaryParticles(DataBlock &data, real t, int dir, BoundarySide sid
 
     data.particles->pack->activeCount -= host_counter(0);
 
-    Kokkos::deep_copy(host_mass_counter, device_mass_counter);
-    data.gravity->centralMass += 4 * M_PI * host_mass_counter(0);
+    // Kokkos::deep_copy(host_mass_counter, device_mass_counter);
+    // data.gravity->centralMass += 4 * M_PI * host_mass_counter(0);
   }
 
   if ((dir == IDIR) && (side == right)) {
@@ -174,6 +174,25 @@ void UserdefBoundaryParticles(DataBlock &data, real t, int dir, BoundarySide sid
     data.particles->pack->activeCount = 0;
 
   idfx::popRegion();
+}
+
+void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tstop) {
+  // a separate hook is needed for particles because gravity isn't in general
+  // computed at the same time for particles and the fluid.
+
+  // GPUS cannot capture static variables
+  // auto states = data.particles->pack->states;
+  auto isActive = data.particles->pack->isActive;
+  // DataBlockHost d(data);
+  // auto tstop_array = data.particles->pack->GetField<real>("t_stop");
+  auto tstop_array = data.particles->pack->fields.GetField<real>("t_stop");
+
+  idefix_for(
+      "StoppingTime", 0, data.particles->pack->maxActiveIndex + 1, KOKKOS_LAMBDA(int idx) {
+        if (isActive(idx)) {
+          tstop(idx) = tstop_array(idx);
+        }
+      });
 }
 
 // void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, real t) {
@@ -253,6 +272,7 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) // : m_p
   data.hydro->EnrollUserDefBoundary(&UserdefBoundary);
   data.hydro->EnrollIsoSoundSpeed(&MySoundSpeed);
   data.particles->EnrollUserDefBoundary(&UserdefBoundaryParticles);
+  data.particles->EnrollStoppingTime(&UserdefStoppingTime);
 
   sigmaSlopeGlob = input.Get<real>("Setup", "sigmaSlope", 0);
   sigma0Glob = input.Get<real>("Setup", "sigma0", 0);
@@ -270,6 +290,7 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) // : m_p
 void Setup::InitFlow(DataBlock &data) {
   // Create a host copy
   DataBlockHost d(data);
+
   real h0 = h0Glob;
   real sigmaSlope = sigmaSlopeGlob;
   // real sigma0 = sigma0Glob;
@@ -277,6 +298,8 @@ void Setup::InitFlow(DataBlock &data) {
   real sigma0 = PM / dtg * d.PactiveCount; // Not correct but not important
 
   real CsSlope = CsSlopeGlob;
+
+  auto tstop_array = d.Pfields.GetField<real>("t_stop");
 
   for (int k = 0; k < d.np_tot[KDIR]; k++) {
     for (int j = 0; j < d.np_tot[JDIR]; j++) {
@@ -298,7 +321,7 @@ void Setup::InitFlow(DataBlock &data) {
 
   for (int n = 0; n < d.PactiveCount; n++) {
     // d.dustVc[n](RHO, k, j, i) = (1e-5 + 3e-3 * exp(-0.5 * (R - 2.0) * (R - 2.0) / 0.1 / 0.1)) * d.Vc(RHO, k, j, i); //
-    real r = 2 + 0.1 * n;
+    real r = 2.0;
     d.Ps(PX1, n) = r;
     d.Ps(PX2, n) = 0.0;
     d.Ps(PVX1, n) = 0.0;
@@ -306,7 +329,11 @@ void Setup::InitFlow(DataBlock &data) {
     d.Ps(PVX2, n) = Vk0;
     d.Ps(PVX3, n) = 0.0;
     d.Ps(PMASS, n) = PM;
+    tstop_array(n) = pow(10.0, -n);
   }
+  printf("%f", tstop_array(0));
+  printf("%f", tstop_array(1));
+  printf("%f", tstop_array(2));
 
   // Send it all, if needed
   d.SyncToDevice();

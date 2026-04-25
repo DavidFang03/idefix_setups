@@ -4,43 +4,40 @@ use strict;
 use warnings;
 
 # defining subroutine
-sub format_time
+sub format_time 
 {
-    # passing argument
+    # passing argument    
     my $minutes = $_[0];
     my $left_minutes = $minutes % 60;
     my $hours = int($minutes / 60);
     my $slurm_format = sprintf("%02d:%02d:00", $hours, $left_minutes);
     my $idefix_format = $minutes / 60;
-    my %time = (
+    my %time = ( 
         slurm => $slurm_format,
         idefix => $idefix_format
         );
     return %time;
 }
 
-my $minutes         = 20;
-my $gpus            = 1;
+my $minutes         = 240;
+my $gpus            = 2;
 
 my %time_results    = format_time($minutes);
-# my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/myidefix";                            # The directory where calculations are run
-# my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/myidefix";                            # The directory where calculations are run
 my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/IdefixGeoffroy";                            # The directory where calculations are run
-my $folder_name     = "VerticalSettling";
+my $folder_name     = "AODustyLWind";
 my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
 my $qos             = "dev";
 my $nodes           = "1";
-my $gres            = "gpu:".$gpus;
+my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
-my $options         = "-dec 1 1 1" ;
-my $name            = "SettlingL";
-# my $name            = "Settling";
+my $options         = "-restart -dec $gpus 1";
+my $name            = "testrestart";
 
-my @mysubnames = ("Tau");
+my @mysubnames = ("dust");
 
 my @indexes = (0);
 
@@ -50,67 +47,72 @@ my $stringdx_1 = $name."_".$mysubnames[$index]; #OW_test
 my $outputs_path_1 = $folder_path."outputs/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
 my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
 `mkdir -p $vtksdir1`;
-print $vtksdir1."\n";
 
 ##################### .ini file #####################
 my $idefix_limit = $time_results{idefix} * 0.99;
+print $indir."\n";
 `mkdir -p $indir`;
 my $inifile = $indir.$stringdx_1.".ini";
 open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
-X1-grid    1  1.99      1  u  2.01
-X2-grid    1  -0.0125      1  u  0.0125
-X3-grid    1  -0.15  512    u  0.3
+X1-grid    1  1.0  512  l   20.0
+X2-grid    3  0.0  256   u  1.28   96  u  1.861592653589  256  u  3.141592653589793
+# X2-grid    1  0.0  1024  u  3.141592653589793
 
 [TimeIntegrator]
-CFL         0.5
-tstop       20
-first_dt    1.0e-5
-nstages     2
+CFL            0.9
+tstop          10000000.0
+# tstop            1000.0
+first_dt       1.e-6
+nstages        2
+max_runtime    $idefix_limit
 
 [Hydro]
-solver    hllc
-csiso     userdef
-# viscosity    explicit  userdef
-
-# [Dust]
-# nSpecies         3
-# drag             tau  1   0.2   0.04    # St=1, 0.2, 0.04
-# drag_feedback    no
+solver       hlld
+ambipolar    explicit  userdef
+resistivity  explicit  userdef
+gamma        1.0001
 
 [Particles]
-count            per_proc  1
+count            per_proc  4
 stopping_time    constant  1.0
 ParticleMass     3e-3
 DustToGas        3e-3
 
+
 [Gravity]
-potential    central 
+potential    central
 Mcentral     1.0
 
 [Boundary]
 X1-beg    userdef
 X1-end    userdef
-X2-beg    periodic
-X2-end    periodic
-X3-beg    outflow
-X3-end    outflow
+X2-beg    userdef
+X2-end    userdef
 
 [Setup]
-sigma0        0.125
-sigmaSlope    -0.5
-CsSlope       -0.5
-h0            0.05
-alpha         1.0e-4
+Rm0                    10.0
+etab0                  1.0
+epsilon                0.05
+beta                   1000
+# beta->10000?
+epsilonTop             0.3
+Hideal                 5.0
+Am                     1.0
+densityFloor           1.0e-7
+transitionSmoothing    0.5
+fromDump               true
 
 [Output]
-vtk    0.1
-dmp    1000.0
-log        1000
+uservar    eta    Am    InvDt
+vtk        2
 dmp_dir    $outputs_path_1
+log        1000
 vtk_dir    $vtksdir1
+dat_path   $outputs_path_1/timevol.dat
+analysis   1
 
 # File produced automatically by a Perl script
 # Do not edit

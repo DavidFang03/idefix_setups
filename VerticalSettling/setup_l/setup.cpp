@@ -107,7 +107,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
             Vc(VX3, k, j, i) = Vc(VX3, k, j, 2 * ighost - i - 1);
           });
     } else if (side == right) {
-      ighost = data->end[IDIR] - 1;
+      .ighost = data->end[IDIR] - 1;
       ibeg = data->end[IDIR];
       iend = data->np_tot[IDIR];
       idefix_for(

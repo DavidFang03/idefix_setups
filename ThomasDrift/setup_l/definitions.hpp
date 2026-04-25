@@ -3,4 +3,6 @@
 
 #define ISOTHERMAL
 
+#define DISABLE_PARTICLE_FEEDBACK
+
 #define GEOMETRY POLAR
