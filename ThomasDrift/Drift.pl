@@ -24,21 +24,21 @@ my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
 # my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/myidefix";                            # The directory where calculations are run
-my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/IdefixGeoffroy";                            # The directory where calculations are run
+my $IDEFIX_DIR      = "/home/dfang/Code/Lidefix";                            # The directory where calculations are run
 my $folder_name     = "ThomasDrift";
-my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
+my $folder_path     = "/home/dfang/Code/idefix_setups/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
 my $qos             = "dev";
 my $nodes           = "1";
 my $gres            = "gpu:".$gpus;
 my $ntasks_per_node = $gpus;
-my $setup_dir      = $folder_path."setup_l";
+my $setup_dir      = $folder_path."setup";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
-my $name            = "DriftL_2048_Epstein";
+my $name            = "Drift";
 
-my @mysubnames = ("Tau");
+my @mysubnames = ("Size");
 
 my @indexes = (0);
 
@@ -73,10 +73,10 @@ solver    hllc
 csiso     userdef
 # viscosity    explicit  userdef
 
-# [Dust]
-# nSpecies         3
-# drag             tau  1   0.2   0.04    # St=1, 0.2, 0.04
-# drag_feedback    no
+[Dust]
+nSpecies         3
+drag             userdef  1   0.1  0.01    # St=1, 0.2, 0.04
+drag_feedback    no
 
 [Particles]
 count            per_proc  3
@@ -106,7 +106,8 @@ h0            0.05
 alpha         1.0e-4
 
 [Output]
-vtk    2.0
+uservar       st
+vtk    10.0
 dmp    100.0
 log        1000
 dmp_dir    $outputs_path_1

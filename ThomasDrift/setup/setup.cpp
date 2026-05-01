@@ -1,6 +1,7 @@
 #include "setup.hpp"
 #include "idefix.hpp"
 #include <algorithm>
+#include <vector>
 
 real sigmaSlopeGlob;
 real CsSlopeGlob;
@@ -10,6 +11,8 @@ real HidealGlob;
 real gammaGlob;
 real densityFloorGlob;
 real alphaGlob;
+
+std::vector<real> betas;
 
 void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
   IdefixArray1D<real> x1 = data.x[IDIR];
@@ -55,7 +58,25 @@ void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
 void MyDrag(DataBlock *data, int nSpecie, real beta, IdefixArray3D<real> &gamma) {
   // Compute the drag coefficient gamma from the input beta
   auto VcGas = data->hydro->Vc;
-  idefix_for("MyDrag", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) { gamma(k, j, i) = 1 / (beta * VcGas(RHO, k, j, i)); });
+  // auto VcDust = data->dust[nSpecie]->Vc;
+  // auto cs = data->hydro->cs;
+  IdefixArray1D<real> x1 = data->x[IDIR];
+
+  idefix_for(
+      "MyDrag", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
+        // gamma(k, j, i) = 1 / (beta * VcGas(RHO, k, j, i));
+        // real cs = 1.0;
+        // real cs = sqrt(VcGas(PRS, k, j, i));
+        // real cs = sqrt(VcGas(PRS, k, j, i) / VcGas(RHO, k, j, i));
+        real R = x1(i);
+        real h0 = h0Glob;
+        real CsSlope = CsSlopeGlob;
+        real cs = h0 * pow(R, CsSlope);
+
+        // Epstein: beta = s*rhopart
+        // real tau = beta * VcDust(RHO, k, j, i) / (cs(k, j, i) * VcGas(RHO, k, j, i));
+        gamma(k, j, i) = cs / beta;
+      });
 }
 
 // User-defined boundaries
@@ -164,35 +185,51 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
 void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
 
   // Use Invdt as scratch array
-  IdefixArray3D<real> scrh("Scratch", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
-  IdefixArray3D<real> scrh_cs("Scratch_cs", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
+  // IdefixArray3D<real> scrh("Scratch", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
 
   // Ask for a computation of xA ambipolar in this scratch array
-  MySoundSpeed(data, data.t, scrh_cs);
+  // MySoundSpeed(data, data.t, scrh_st);
+  IdefixArray4D<real> scrh_st("Scratch_st", data.dust.size(), data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
+  auto Vc = data.hydro->Vc;
+  auto x1 = data.x[IDIR];
+  for (int n = 0; n < data.dust.size(); n++) {
+    IdefixArray3D<real> scrh_gamma1("Scratch_gamma1", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
+    MyDrag(&data, n, betas[n], scrh_gamma1);
+    idefix_for(
+        "StokesUserVar", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR],
+        KOKKOS_LAMBDA(int k, int j, int i) { scrh_st(n, k, j, i) = pow(x1(i), -1.5) * Vc(RHO, k, j, i) / scrh_gamma1(k, j, i); });
+  }
+
+  DataBlockHost d(data);
+  d.SyncFromDevice();
 
   // Mirror data on Host
-  DataBlockHost d(data);
 
   // Sync it
-  d.SyncFromDevice();
 
   // Make references to the user-defined arrays (variables is a container of
   // IdefixHostArray3D) Note that the labels should match the variable names in
   // the input file
-  IdefixHostArray3D<real> cs = variables["cs"];
+  IdefixHostArray3D<real> st0 = variables["st0"];
+  IdefixHostArray3D<real> st1 = variables["st1"];
+  IdefixHostArray3D<real> st2 = variables["st2"];
+  // IdefixHostArray4D<real> Vc = d.Vc;
 
-  IdefixHostArray4D<real> Vc = d.Vc;
+  IdefixArray4D<real>::HostMirror scrhHost_st = Kokkos::create_mirror_view(scrh_st);
+  Kokkos::deep_copy(scrhHost_st, scrh_st);
 
-  IdefixArray3D<real>::HostMirror scrhHost_cs = Kokkos::create_mirror_view(scrh_cs);
-  Kokkos::deep_copy(scrhHost_cs, scrh_cs);
+  // for (int n = 0; n < data.dust.size(); n++) {
 
   for (int k = d.beg[KDIR]; k < d.end[KDIR]; k++) {
     for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
       for (int i = d.beg[IDIR]; i < d.end[IDIR]; i++) {
-        cs(k, j, i) = scrhHost_cs(k, j, i);
+        st0(k, j, i) = scrhHost_st(0, k, j, i);
+        st1(k, j, i) = scrhHost_st(1, k, j, i);
+        st2(k, j, i) = scrhHost_st(2, k, j, i);
       }
     }
   }
+  // }
 }
 
 // Default constructor
@@ -211,7 +248,7 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) // : m_p
   }
 
   data.hydro->EnrollIsoSoundSpeed(&MySoundSpeed);
-  output.EnrollUserDefVariables(&ComputeUserVars);
+  // output.EnrollUserDefVariables(&ComputeUserVars);
 
   // if(data.haveFargo)
   //   data.fargo->EnrollVelocity(&FargoVelocity);
@@ -219,6 +256,12 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) // : m_p
   sigma0Glob = input.Get<real>("Setup", "sigma0", 0);
   CsSlopeGlob = input.Get<real>("Setup", "CsSlope", 0);
   h0Glob = input.Get<real>("Setup", "h0", 0);
+
+  int nSpecies = input.Get<int>("Dust", "nSpecies", 0);
+  // IdefixHostArray1D<real> betas("betas", nSpecies);
+  for (int i = 0; i < nSpecies; i++) {
+    betas.push_back(input.Get<real>("Dust", "drag", i + 1));
+  }
 }
 
 // This routine initialize the flow
@@ -243,7 +286,7 @@ void Setup::InitFlow(DataBlock &data) {
         real Omega = pow(R, -1.5);
         real hg2 = cs2 / Omega / Omega;
 
-        d.Vc(RHO, k, j, i) = sigma0 * pow(R, sigmaSlope - 1.0) * exp(R * R / hg2 * (1.0 / sqrt(1.0 + z * z / R / R) - 1.0));
+        d.Vc(RHO, k, j, i) = 1e-6 + sigma0 * pow(R, sigmaSlope - 1.0) * exp(R * R / hg2 * (1.0 / sqrt(1.0 + z * z / R / R) - 1.0));
         d.Vc(VX1, k, j, i) = 0.0; //+sin(8*d.x[JDIR](j));
         d.Vc(VX3, k, j, i) = 0.0;
         d.Vc(VX2, k, j, i) = Vk * (1 + 0.5 * (hg2 / R / R) * (sigmaSlope - 1.0 + 2 * CsSlope + 2 * CsSlope * z * z / 2.0 / hg2));
