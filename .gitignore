@@ -19,3 +19,4 @@
 Idefix2Python/
 *.npy
 *.ipynb
+*.pyc

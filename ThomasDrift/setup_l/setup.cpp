@@ -176,20 +176,78 @@ void UserdefBoundaryParticles(DataBlock &data, real t, int dir, BoundarySide sid
   idfx::popRegion();
 }
 
+// void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tstop) {
+//   // a separate hook is needed for particles because gravity isn't in general
+//   // computed at the same time for particles and the fluid.
+
+//   // GPUS cannot capture static variables
+//   // auto states = data.particles->pack->states;
+//   auto isActive = data.particles->pack->isActive;
+//   // DataBlockHost d(data);
+//   auto betas = data.particles->pack->fields.GetField<real>("betas");
+
+//   idefix_for(
+//       "StoppingTime", 0, data.particles->pack->maxActiveIndex + 1, KOKKOS_LAMBDA(int idx) {
+//         if (isActive(idx)) {
+//           tstop(idx) = betas(idx);
+//         }
+//       });
+// }
+
 void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tstop) {
   // a separate hook is needed for particles because gravity isn't in general
   // computed at the same time for particles and the fluid.
 
   // GPUS cannot capture static variables
   // auto states = data.particles->pack->states;
+  auto states = data.particles->pack->states;
   auto isActive = data.particles->pack->isActive;
-  // DataBlockHost d(data);
-  auto tstop_array = data.particles->pack->fields.GetField<real>("t_stop");
+  auto betas = data.particles->pack->fields.GetField<real>("betas");
+
+  DataBlockHost d(data);
+
+  IdefixArray4D<real> Vc = data.hydro->Vc;
+
+  int i_gbeg = d.gbeg[IDIR];
+  int j_gbeg = d.gbeg[JDIR];
+  int ibeg = d.beg[IDIR];
+  int jbeg = d.beg[JDIR];
+  int iend = d.end[IDIR];
+  int kbeg = d.beg[KDIR];
+
+  real iint = d.np_int[IDIR];
+  real r_beg = d.x[IDIR](ibeg);
+  real r_end = d.x[IDIR](iend);
+  real dr = d.x[IDIR](ibeg + 1) - d.x[IDIR](ibeg);
+
+  real theta_beg = d.x[JDIR](jbeg);
+  real dtheta = d.x[JDIR](jbeg + 1) - d.x[JDIR](jbeg);
+  real phi_beg = d.x[KDIR](kbeg);
+  real dphi = d.x[KDIR](kbeg + 1) - d.x[KDIR](kbeg);
+
+  real sigma0 = sigma0Glob;
+  real sigmaSlope = sigmaSlopeGlob;
+  real h0 = h0Glob;
+  real CsSlope = CsSlopeGlob;
 
   idefix_for(
       "StoppingTime", 0, data.particles->pack->maxActiveIndex + 1, KOKKOS_LAMBDA(int idx) {
         if (isActive(idx)) {
-          tstop(idx) = tstop_array(idx);
+
+          real r = states(PX1, idx);
+          real theta = states(PX2, idx);
+          real phi = states(PX3, idx);
+
+          // int i = floor(iint * (log(r / r_beg)) / log(r_end / r_beg)) + ibeg; //TODO SWITCH FOR LOG
+          int i = floor((r - r_beg) / dr) + ibeg;
+          int j = floor((theta - theta_beg) / dtheta) + jbeg;
+          int k = floor((phi - phi_beg) / dphi) + kbeg;
+
+          real beta = betas(idx);
+          real cs = h0 * pow(r, CsSlope); // TODO change that for wind
+
+          // tstop(idx) = 1.0;
+          tstop(idx) = beta / (cs * Vc(RHO, kbeg, j, i));
         }
       });
 }
@@ -272,6 +330,7 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) // : m_p
   data.hydro->EnrollIsoSoundSpeed(&MySoundSpeed);
   data.particles->EnrollUserDefBoundary(&UserdefBoundaryParticles);
   data.particles->EnrollStoppingTime(&UserdefStoppingTime);
+  // output.EnrollUserDefVariables(&ComputeUserVars);
 
   sigmaSlopeGlob = input.Get<real>("Setup", "sigmaSlope", 0);
   sigma0Glob = input.Get<real>("Setup", "sigma0", 0);
@@ -290,16 +349,12 @@ void Setup::InitFlow(DataBlock &data) {
   // Create a host copy
   DataBlockHost d(data);
 
-  real h0 = h0Glob;
+  real sigma0 = sigma0Glob;
   real sigmaSlope = sigmaSlopeGlob;
-  // real sigma0 = sigma0Glob;
-  // real PM = sigma0 * dtg / d.activeCount;
-  real sigma0 = PM / dtg * d.PactiveCount; // Not correct but not important
-
+  real h0 = h0Glob;
   real CsSlope = CsSlopeGlob;
 
-  auto size = d.Pfields.GetField<real>("size");
-  auto tstop_array = d.Pfields.GetField<real>("t_stop");
+  auto betas = d.Pfields.GetField<real>("betas");
 
   for (int k = 0; k < d.np_tot[KDIR]; k++) {
     for (int j = 0; j < d.np_tot[JDIR]; j++) {
@@ -329,11 +384,11 @@ void Setup::InitFlow(DataBlock &data) {
     d.Ps(PVX2, n) = Vk0;
     d.Ps(PVX3, n) = 0.0;
     d.Ps(PMASS, n) = PM;
-    size(n) = pow(10.0, -n);
+    betas(n) = pow(10.0, -n);
   }
-  printf("%f", tstop_array(0));
-  printf("%f", tstop_array(1));
-  printf("%f", tstop_array(2));
+  printf("%f", betas(0));
+  printf("%f", betas(1));
+  printf("%f", betas(2));
 
   // Send it all, if needed
   d.SyncToDevice();

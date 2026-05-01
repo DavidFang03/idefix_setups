@@ -17,7 +17,6 @@ void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tst
 
   auto states = data.particles->pack->states;
   auto isActive = data.particles->pack->isActive;
-  // DataBlockHost d(data);
   auto tstop_array = data.particles->pack->fields.GetField<real>("t_stop");
   // auto r_indexes = data.particles->pack->fields.GetField<real>("r_indexes");
   // auto theta_indexes =
@@ -28,12 +27,7 @@ void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tst
   // cell where the particle is in.
   // TODO: Interpolation?
   DataBlockHost d(data);
-  // d.SyncFromDevice();
 
-  // IdefixHostArray1D<real> x1 = d.x[IDIR];
-  // IdefixHostArray1D<real> x2 = d.x[JDIR];
-  // IdefixHostArray1D<real> x3 = d.x[KDIR];
-  // IdefixHostArray4D<real> Vc = d.Vc;
   IdefixArray4D<real> Vc = data.hydro->Vc;
 
   int i_gbeg = d.gbeg[IDIR];
@@ -52,11 +46,6 @@ void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tst
   real phi_beg = d.x[KDIR](kbeg);
   real dphi = d.x[KDIR](kbeg + 1) - d.x[KDIR](kbeg);
 
-  // IdefixHostArray1D<real> host_tstop = IdefixHostArray1D<real>("host_tstop", 1);
-
-  // for (int n = 0; n < d.PactiveCount; n++) {
-  //   tstop(n) = 1;
-  // }
   idefix_for(
       "StoppingTime", 0, data.particles->pack->maxActiveIndex + 1, KOKKOS_LAMBDA(int idx) {
         if (isActive(idx)) {

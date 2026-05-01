@@ -2,5 +2,6 @@
 #define DIMENSIONS 1
 
 #define ISOTHERMAL
+#define DISABLE_FLOW_EVOLUTION
 
 #define GEOMETRY POLAR

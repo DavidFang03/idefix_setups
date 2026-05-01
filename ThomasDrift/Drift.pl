@@ -33,10 +33,10 @@ my $qos             = "dev";
 my $nodes           = "1";
 my $gres            = "gpu:".$gpus;
 my $ntasks_per_node = $gpus;
-my $setup_dir      = $folder_path."setup";
+my $setup_dir      = $folder_path."setup_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
-my $name            = "Drift";
+my $name            = "DriftL";
 
 my @mysubnames = ("Size");
 
@@ -73,17 +73,17 @@ solver    hllc
 csiso     userdef
 # viscosity    explicit  userdef
 
-[Dust]
-nSpecies         3
-drag             userdef  1   0.1  0.01    # St=1, 0.2, 0.04
-drag_feedback    no
+# [Dust]
+# nSpecies         3
+# drag             userdef  1   0.1  0.01    # St=1, 0.2, 0.04
+# drag_feedback    no
 
 [Particles]
 count            per_proc  3
 stopping_time    userdef
 ParticleMass     3e-3
 DustToGas        3e-3
-fields_real      size
+fields_real      betas
 # fields_real      t_stop
 
 [Gravity]

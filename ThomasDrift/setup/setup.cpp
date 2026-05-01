@@ -293,7 +293,7 @@ void Setup::InitFlow(DataBlock &data) {
 
         for (int n = 0; n < data.dust.size(); n++) {
           // d.dustVc[n](RHO, k, j, i) = 0.01 * sigma0;
-          d.dustVc[n](RHO, k, j, i) = (1e-5 + 3e-3 * exp(-0.5 * (R - 2.0) * (R - 2.0) / 0.1 / 0.1)) * d.Vc(RHO, k, j, i);
+          d.dustVc[n](RHO, k, j, i) = (1e-5 + 3e-3 * exp(-0.5 * (R - 2.0) * (R - 2.0) / 0.05 / 0.05)) * d.Vc(RHO, k, j, i);
           d.dustVc[n](VX1, k, j, i) = 0.0;
           d.dustVc[n](VX2, k, j, i) = Vk;
           d.dustVc[n](VX3, k, j, i) = 0.0;

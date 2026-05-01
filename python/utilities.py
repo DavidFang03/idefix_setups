@@ -25,36 +25,44 @@ def vK(r):
 
 
 class Fluid:
-    def __init__(self, cs0, csSlope, sigma0, sigmaSlope, tau0, r0=2, z0=0.1):
+    def __init__(self, cs0, csSlope, sigma0, sigmaSlope, beta, r0, z0, drag):
         self.cs0 = cs0
         self.csSlope = csSlope
         self.sigma0 = sigma0
         self.sigmaSlope = sigmaSlope
         self.rhoSlope = sigmaSlope - 1
-        # # HSlope = csSlope + 0.5
-        # # self.rhoSlope = sigmaSlope + csSlope - 0.5
-        # self.rhoSlope = sigmaSlope
-        # self.cs0 = 0.05
-        # self.csSlope = -0.5
-        # self.rhoSlope = -1.5
-        self.tau0 = tau0
+        self.beta = beta
+        self.drag = drag
 
         self.r0 = r0
         self.z0 = z0
 
+    def cs(self, r):
+        return self.cs0 * r ** (self.csSlope)
+
+    def sigma(self, r):
+        return self.sigma0 * r ** (self.sigmaSlope)
+
     def eta(self, r):
-        cs0 = self.cs0
         csSlope = self.csSlope
         rhoSlope = self.rhoSlope
-        cs2 = cs0**2 * np.pow(r, 2 * csSlope)
-        return cs2 / (vK(r) ** 2) * (2 * csSlope + rhoSlope)
+        return (self.cs(r) / vK(r)) ** 2 * (2 * csSlope + rhoSlope)
 
     def Stokes(self, r):
-        tau0 = self.tau0
+        if self.drag.lower() in ["epstein", "size"]:
+            cs = self.cs0 * r ** (self.csSlope)
+            rho = self.sigma0 * r ** (self.rhoSlope)
+            tau = self.beta / (cs * rho)
+
+        elif self.drag.lower() in ["tau"]:
+            tau = self.beta
+
+        else:
+            raise NotImplementedError(f"Not implemented drag: {self.drag}")
 
         # return tau0
         OmegaK = r ** (-1.5)
-        return tau0 * OmegaK
+        return tau * OmegaK
         # return tau0 * self.sigma0 * OmegaK / r ** (self.csSlope)
 
     def vrDrift(self, r):
