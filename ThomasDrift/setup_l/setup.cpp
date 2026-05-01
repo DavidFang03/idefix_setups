@@ -184,7 +184,6 @@ void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tst
   // auto states = data.particles->pack->states;
   auto isActive = data.particles->pack->isActive;
   // DataBlockHost d(data);
-  // auto tstop_array = data.particles->pack->GetField<real>("t_stop");
   auto tstop_array = data.particles->pack->fields.GetField<real>("t_stop");
 
   idefix_for(
@@ -299,6 +298,7 @@ void Setup::InitFlow(DataBlock &data) {
 
   real CsSlope = CsSlopeGlob;
 
+  auto size = d.Pfields.GetField<real>("size");
   auto tstop_array = d.Pfields.GetField<real>("t_stop");
 
   for (int k = 0; k < d.np_tot[KDIR]; k++) {
@@ -329,7 +329,7 @@ void Setup::InitFlow(DataBlock &data) {
     d.Ps(PVX2, n) = Vk0;
     d.Ps(PVX3, n) = 0.0;
     d.Ps(PMASS, n) = PM;
-    tstop_array(n) = pow(10.0, -n);
+    size(n) = pow(10.0, -n);
   }
   printf("%f", tstop_array(0));
   printf("%f", tstop_array(1));

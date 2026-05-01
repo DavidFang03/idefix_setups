@@ -36,7 +36,7 @@ my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
-my $name            = "DriftL";
+my $name            = "DriftL_2048_Epstein";
 
 my @mysubnames = ("Tau");
 
@@ -58,13 +58,13 @@ open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
-X1-grid    1  0.4      512  u  2.5
+X1-grid    1  0.4      2048  u  2.5
 X2-grid    1  -0.0125      1  u  0.0125
 X3-grid    1  -0.0125  1    u  0.0125
 
 [TimeIntegrator]
 CFL         0.5
-tstop       2000
+tstop       750
 first_dt    1.0e-5
 nstages     2
 
@@ -79,10 +79,12 @@ csiso     userdef
 # drag_feedback    no
 
 [Particles]
-count            per_proc  1
-stopping_time    constant  1.0
+count            per_proc  3
+stopping_time    userdef
 ParticleMass     3e-3
 DustToGas        3e-3
+fields_real      size
+# fields_real      t_stop
 
 [Gravity]
 potential    central 
@@ -104,7 +106,7 @@ h0            0.05
 alpha         1.0e-4
 
 [Output]
-vtk    10.0
+vtk    2.0
 dmp    100.0
 log        1000
 dmp_dir    $outputs_path_1

@@ -17,6 +17,8 @@ real etab0;
 real dtg;
 real PM;
 
+bool fromDump;
+
 static std::string dat_path;
 Analysis *analysis;
 
@@ -164,27 +166,51 @@ void MySourceTerm(Hydro *hydro, const real t, const real dtin) {
 
   idefix_for(
       "MySourceTerm", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-    real r = x1(i);
-    real th = x2(j);
-    real z = r * cos(th);
-    real R = r * sin(th);
-    real R0 = FMAX(R, Rin);
-    real tau;
+        real r = x1(i);
+        real th = x2(j);
+        real z = r * cos(th);
+        real R = r * sin(th);
+        real R0 = FMAX(R, Rin);
+        real tau;
 
-    real Zh = FABS(z / R) / epsilon;
-    real Tdisk = epsilon * epsilon / R0;
-    real Tcorona = epsilonTop * epsilonTop / R0;
-    real Teff = 0.5 * (Tdisk + Tcorona) + 0.5 * (Tcorona - Tdisk) * tanh((Zh - Hideal) / trSmoothing);
+        real Zh = FABS(z / R) / epsilon;
+        real Tdisk = epsilon * epsilon / R0;
+        real Tcorona = epsilonTop * epsilonTop / R0;
+        // if(x1(i) < 1.5) cscorona = csdisk;
+        real Teff = 0.5 * (Tdisk + Tcorona) + 0.5 * (Tcorona - Tdisk) * tanh((Zh - Hideal) / trSmoothing);
 
-    tau = tauGlob * (FMIN(pow(R, 1.5), 1.0));
+        tau = tauGlob * (FMIN(pow(R, 1.5), 1.0));
 
-    // Cooling /heatig function
-    real Ptarget = Teff * Vc(RHO, k, j, i);
+        // Cooling /heatig function
+        real Ptarget = Teff * Vc(RHO, k, j, i);
 
-    Uc(ENG, k, j, i) += -dt * (Vc(PRS, k, j, i) - Ptarget) / (tau * gamma_m1);
+        Uc(ENG, k, j, i) += -dt * (Vc(PRS, k, j, i) - Ptarget) / (tau * gamma_m1);
 
+        // inner shell relaxation
+        /*
+        if(r<1.2) {
+          real rhoTarget = 1.0/(R0*sqrt(R0))  * exp(1.0/ Tdisk *
+        (1.0/sqrt(R0*R0+z*z)-1.0/R0)); real densityFloor =
+        computeDensityFloor(R,z,densityFloor0,Rin,epsilon); if(rhoTarget <
+        densityFloor) rhoTarget = densityFloor;
+
+          real vx3Target = 1.0/sqrt(R0) * sqrt( FMAX(R0 / sqrt(R0*R0 + z*z)
+        -2.5*Tdisk,0.0) );
+
+          real drho = (Vc(RHO,k,j,i)-rhoTarget) / tauVel;
+          real dmx1 = Vc(RHO,k,j,i)*Vc(VX1,k,j,i) / tauVel + Vc(VX1,k,j,i) *
+        drho; real dmx2 = Vc(RHO,k,j,i)*Vc(VX2,k,j,i) / tauVel + Vc(VX2,k,j,i) *
+        drho; real dmx3 = Vc(RHO,k,j,i)*(Vc(VX3,k,j,i)-vx3Target) / tauVel +
+        Vc(VX3,k,j,i) * drho; real deng = Vc(VX1,k,j,i)*dmx1 +
+        Vc(VX2,k,j,i)*dmx2 + Vc(VX3,k,j,i)*dmx3;
+
+          Uc(RHO,k,j,i) += -drho*dt;
+          Uc(MX1,k,j,i) += -dmx1*dt;
+          Uc(MX2,k,j,i) += -dmx2*dt;
+          Uc(MX3,k,j,i) += -dmx3*dt;
+          Uc(ENG,k,j,i) += -deng*dt;
         }*/
-});
+      });
 }
 
 void InternalBoundary(Hydro *hydro, const real t) {
@@ -218,7 +244,16 @@ void InternalBoundary(Hydro *hydro, const real t) {
         if (Vc(RHO, k, j, i) < densityFloor) {
           real T = Vc(PRS, k, j, i) / Vc(RHO, k, j, i);
           Vc(RHO, k, j, i) = densityFloor;
+          // Vc(PRS,k,j,i)=T*Vc(RHO,k,j,i);
         }
+
+        /*
+          real R = x1(i)*sin(x2(j));
+          if(R<1.0) {
+              Vc(VX1,k,j,i) = ZERO_F;
+              Vc(VX2,k,j,i) = ZERO_F;
+              Vc(VX3,k,j,i) = R;
+          }*/
       });
 }
 // User-defined boundaries
@@ -348,86 +383,86 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
   }
 }
 
-void UserdefBoundaryParticles(DataBlock &data, real t, int dir, BoundarySide side) {
-  idfx::pushRegion("UserdefBoundaryParticles");
-  auto states = data.particles->pack->states;
-  IdefixArray1D<bool> isActive = data.particles->pack->isActive;
-  int capacity = data.particles->pack->capacity;
+// void UserdefBoundaryParticles(DataBlock &data, real t, int dir, BoundarySide side) {
+//   idfx::pushRegion("UserdefBoundaryParticles");
+//   auto states = data.particles->pack->states;
+//   IdefixArray1D<bool> isActive = data.particles->pack->isActive;
+//   int capacity = data.particles->pack->capacity;
 
-  IdefixHostArray1D<int> host_counter = IdefixHostArray1D<int>("counter", 1);
-  IdefixArray1D<int> device_counter = IdefixArray1D<int>("counter", 1);
+//   IdefixHostArray1D<int> host_counter = IdefixHostArray1D<int>("counter", 1);
+//   IdefixArray1D<int> device_counter = IdefixArray1D<int>("counter", 1);
 
-  IdefixHostArray1D<real> host_mass_counter = IdefixHostArray1D<real>("mass_counter", 1);
-  IdefixArray1D<real> device_mass_counter = IdefixArray1D<real>("counter", 1);
+//   IdefixHostArray1D<real> host_mass_counter = IdefixHostArray1D<real>("mass_counter", 1);
+//   IdefixArray1D<real> device_mass_counter = IdefixArray1D<real>("counter", 1);
 
-  if ((dir == IDIR) && (side == left)) {
-    const real xl = data.mygrid->xbeg[IDIR];
-    idefix_for(
-        "UserdefParticlesBoundary", 0, capacity, KOKKOS_LAMBDA(int idx) {
-          real x = states(dir, idx);
-          if (isActive(idx) && x < xl) {
-            isActive(idx) = false;
-            Kokkos::atomic_add(&device_counter(0), 1);
-            Kokkos::atomic_add(&device_mass_counter(0), states(PMASS, idx));
-          }
-        });
-    Kokkos::deep_copy(host_counter, device_counter);
+//   if ((dir == IDIR) && (side == left)) {
+//     const real xl = data.mygrid->xbeg[IDIR];
+//     idefix_for(
+//         "UserdefParticlesBoundary", 0, capacity, KOKKOS_LAMBDA(int idx) {
+//           real x = states(dir, idx);
+//           if (isActive(idx) && x < xl) {
+//             isActive(idx) = false;
+//             Kokkos::atomic_add(&device_counter(0), 1);
+//             Kokkos::atomic_add(&device_mass_counter(0), states(PMASS, idx));
+//           }
+//         });
+//     Kokkos::deep_copy(host_counter, device_counter);
 
-    data.particles->pack->activeCount -= host_counter(0);
+//     data.particles->pack->activeCount -= host_counter(0);
 
-    Kokkos::deep_copy(host_mass_counter, device_mass_counter);
-    data.gravity->centralMass += 4 * M_PI * host_mass_counter(0);
-  }
+//     Kokkos::deep_copy(host_mass_counter, device_mass_counter);
+//     data.gravity->centralMass += 4 * M_PI * host_mass_counter(0);
+//   }
 
-  if ((dir == IDIR) && (side == right)) {
-    const real xr = data.mygrid->xend[IDIR];
-    idefix_for(
-        "UserdefParticlesBoundary", 0, capacity, KOKKOS_LAMBDA(int idx) {
-          real x = states(dir, idx);
-          if (isActive(idx) && x > xr) {
-            isActive(idx) = false;
-            Kokkos::atomic_add(&device_counter(0), 1);
-          }
-        });
-    Kokkos::deep_copy(host_counter, device_counter);
-    data.particles->pack->activeCount -= host_counter(0);
-  }
+//   if ((dir == IDIR) && (side == right)) {
+//     const real xr = data.mygrid->xend[IDIR];
+//     idefix_for(
+//         "UserdefParticlesBoundary", 0, capacity, KOKKOS_LAMBDA(int idx) {
+//           real x = states(dir, idx);
+//           if (isActive(idx) && x > xr) {
+//             isActive(idx) = false;
+//             Kokkos::atomic_add(&device_counter(0), 1);
+//           }
+//         });
+//     Kokkos::deep_copy(host_counter, device_counter);
+//     data.particles->pack->activeCount -= host_counter(0);
+//   }
 
-  if ((dir == JDIR) && (side == left)) {
-    const real thetal = data.mygrid->xbeg[JDIR];
-    idefix_for(
-        "UserdefParticlesBoundary", 0, capacity, KOKKOS_LAMBDA(int idx) {
-          real x = states(dir, idx);
-          if (isActive(idx) && x < thetal) {
-            isActive(idx) = false;
-            Kokkos::atomic_add(&device_counter(0), 1);
-          }
-        });
-    Kokkos::deep_copy(host_counter, device_counter);
+//   if ((dir == JDIR) && (side == left)) {
+//     const real thetal = data.mygrid->xbeg[JDIR];
+//     idefix_for(
+//         "UserdefParticlesBoundary", 0, capacity, KOKKOS_LAMBDA(int idx) {
+//           real x = states(dir, idx);
+//           if (isActive(idx) && x < thetal) {
+//             isActive(idx) = false;
+//             Kokkos::atomic_add(&device_counter(0), 1);
+//           }
+//         });
+//     Kokkos::deep_copy(host_counter, device_counter);
 
-    data.particles->pack->activeCount -= host_counter(0);
-  }
+//     data.particles->pack->activeCount -= host_counter(0);
+//   }
 
-  if ((dir == JDIR) && (side == right)) {
-    const real thetar = data.mygrid->xend[JDIR];
-    idefix_for(
-        "UserdefParticlesBoundary", 0, capacity, KOKKOS_LAMBDA(int idx) {
-          real x = states(dir, idx);
-          if (isActive(idx) && x > thetar) {
-            isActive(idx) = false;
-            Kokkos::atomic_add(&device_counter(0), 1);
-          }
-        });
-    Kokkos::deep_copy(host_counter, device_counter);
+//   if ((dir == JDIR) && (side == right)) {
+//     const real thetar = data.mygrid->xend[JDIR];
+//     idefix_for(
+//         "UserdefParticlesBoundary", 0, capacity, KOKKOS_LAMBDA(int idx) {
+//           real x = states(dir, idx);
+//           if (isActive(idx) && x > thetar) {
+//             isActive(idx) = false;
+//             Kokkos::atomic_add(&device_counter(0), 1);
+//           }
+//         });
+//     Kokkos::deep_copy(host_counter, device_counter);
 
-    data.particles->pack->activeCount -= host_counter(0);
-  }
+//     data.particles->pack->activeCount -= host_counter(0);
+//   }
 
-  if (data.particles->pack->activeCount < 0)
-    data.particles->pack->activeCount = 0;
+//   if (data.particles->pack->activeCount < 0)
+//     data.particles->pack->activeCount = 0;
 
-  idfx::popRegion();
-}
+//   idfx::popRegion();
+// }
 
 void EmfBoundary(DataBlock &data, const real t) {
   IdefixArray3D<real> Ex1 = data.hydro->emf->ex;
@@ -450,6 +485,61 @@ void EmfBoundary(DataBlock &data, const real t) {
     // printf("I'mbeing called\n");
     idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int i) { Ex3(k, jghost, i) = ZERO_F; });
   }
+}
+
+void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, real t) {
+  IdefixArray4D<real> Vc = dust->Vc;
+  auto data = dust->data;
+  IdefixArray1D<real> x1 = data->x[IDIR];
+  if (dir == IDIR) {
+    int ighost, ibeg, iend;
+    if (side == left) {
+      ighost = data->beg[IDIR];
+      ibeg = 0;
+      iend = data->beg[IDIR];
+      idefix_for(
+          "UserDefBoundaryDustX1", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
+            real R = x1(i);
+            real Vk = 1.0 / sqrt(R);
+
+            Vc(RHO, k, j, i) = Vc(RHO, k, j, 2 * ighost - i - 1);
+            if (Vc(VX1, k, j, ighost) >= ZERO_F) {
+              Vc(VX1, k, j, i) = 0.0;
+            } else {
+              // Vc(VX1,k,j,i) = - Vc(VX1,k,j,2*ighost - i +1);
+              Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
+            }
+            Vc(VX2, k, j, i) = Vc(VX2, k, j, 2 * ighost - i - 1);
+            Vc(VX3, k, j, i) = Vk;
+          });
+    } else if (side == right) {
+      ighost = data->end[IDIR] - 1;
+      ibeg = data->end[IDIR];
+      iend = data->np_tot[IDIR];
+      idefix_for(
+          "UserDefBoundaryDustX1", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
+            real R = x1(i);
+            real Vk = 1.0 / sqrt(R);
+
+            Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
+            Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
+            if (Vc(VX1, k, j, ighost) <= ZERO_F) {
+              Vc(VX1, k, j, i) = 0.0;
+            }
+            // if(Vc(VX1,k,j,i)<=ZERO_F){
+            //   Vc(VX1,k,j,ighost) = 0.0;
+            // }
+            Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
+            Vc(VX3, k, j, i) = Vk;
+          });
+    }
+  }
+}
+
+void MyDrag(DataBlock *data, int nSpecie, real beta, IdefixArray3D<real> &gamma) {
+  // Compute the drag coefficient gamma from the input beta
+  auto VcGas = data->hydro->Vc;
+  idefix_for("MyDrag", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) { gamma(k, j, i) = 1 / (beta * VcGas(RHO, k, j, i)); });
 }
 
 void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
@@ -513,6 +603,14 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   data.hydro->EnrollEmfBoundary(&EmfBoundary);
   // data.particles->EnrollUserDefBoundary(&UserdefBoundaryParticles);
 
+  if (data.haveDust) {
+    int nSpecies = data.dust.size();
+    for (int n = 0; n < nSpecies; n++) {
+      data.dust[n]->EnrollUserDefBoundary(&UserdefBoundaryDust);
+      data.dust[n]->drag->EnrollUserDrag(&MyDrag);
+    }
+  }
+
   output.EnrollUserDefVariables(&ComputeUserVars);
   gammaGlob = data.hydro->eos->GetGamma();
   epsilonGlob = input.Get<real>("Setup", "epsilon", 0);
@@ -524,6 +622,8 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   trSmoothingGlob = input.Get<real>("Setup", "transitionSmoothing", 0);
   Rm0 = input.Get<real>("Setup", "Rm0", 0);
   etab0 = input.Get<real>("Setup", "etab0", 0);
+
+  fromDump = input.GetOrSet<bool>("Setup", "fromDump", 0, false);
 
   // PM = input.Get<real>("Particles", "ParticleMass", 0);
   // dtg = input.Get<real>("Particles", "DustToGas", 0);
@@ -544,39 +644,153 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
 void Setup::InitFlow(DataBlock &data) {
   // Create a host copy
   DataBlockHost d(data);
-  DumpImage image("dustless.dmp", &data);
-  // Make vector potential
-  IdefixHostArray4D<real> A = IdefixHostArray4D<real>("Setup_VectorPotential", 3, data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
 
-  real Rin = 1.0;
-  real m = -5.0 / 4.0;
-  real B0 = epsilonGlob * sqrt(2.0 / betaGlob);
+  if (fromDump) {
+    DumpImage image("dustless.dmp", &data);
 
+    for (int k = d.beg[KDIR]; k < d.end[KDIR]; k++) {
+      for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
+        for (int i = d.beg[IDIR]; i < d.end[IDIR]; i++) {
+
+          // Note that the restart dump array only contains the full (global) active domain
+          // (i.e. it excludes the boundaries, but it is not decomposed accross MPI procs)
+          int iglob = i - d.beg[IDIR] + d.gbeg[IDIR];
+          int jglob = j - d.beg[JDIR] + d.gbeg[JDIR];
+          int kglob = k - d.beg[KDIR] + d.gbeg[KDIR];
+
+          d.Vc(RHO, k, j, i) = image.arrays["Vc-RHO"](kglob, jglob, iglob);
+          d.Vc(PRS, k, j, i) = image.arrays["Vc-PRS"](kglob, jglob, iglob);
+          d.Vc(VX1, k, j, i) = image.arrays["Vc-VX1"](kglob, jglob, iglob);
+          d.Vc(VX2, k, j, i) = image.arrays["Vc-VX2"](kglob, jglob, iglob);
+          d.Vc(VX3, k, j, i) = image.arrays["Vc-VX3"](kglob, jglob, iglob);
+        }
+      }
+    }
+    for (int k = d.beg[KDIR]; k < d.end[KDIR]; k++) {
+      for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
+        for (int i = d.beg[IDIR]; i < d.end[IDIR] + IOFFSET; i++) {
+          int iglob = i - d.beg[IDIR] + d.gbeg[IDIR];
+          int jglob = j - d.beg[JDIR] + d.gbeg[JDIR];
+          int kglob = k - d.beg[KDIR] + d.gbeg[KDIR];
+          d.Vs(BX1s, k, j, i) = image.arrays["Vs-BX1s"](kglob, jglob, iglob);
+        }
+      }
+    }
+    for (int k = d.beg[KDIR]; k < d.end[KDIR]; k++) {
+      for (int j = d.beg[JDIR]; j < d.end[JDIR] + IOFFSET; j++) {
+        for (int i = d.beg[IDIR]; i < d.end[IDIR]; i++) {
+          int iglob = i - d.beg[IDIR] + d.gbeg[IDIR];
+          int jglob = j - d.beg[JDIR] + d.gbeg[JDIR];
+          int kglob = k - d.beg[KDIR] + d.gbeg[KDIR];
+          d.Vs(BX2s, k, j, i) = image.arrays["Vs-BX2s"](kglob, jglob, iglob);
+        }
+      }
+    }
+
+  } else {
+
+    // Make vector potential
+    IdefixHostArray4D<real> A = IdefixHostArray4D<real>("Setup_VectorPotential", 3, data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
+
+    real Rin = 1.0;
+    real m = -5.0 / 4.0;
+    real B0 = epsilonGlob * sqrt(2.0 / betaGlob);
+
+    for (int k = 0; k < d.np_tot[KDIR]; k++) {
+      for (int j = 0; j < d.np_tot[JDIR]; j++) {
+        for (int i = 0; i < d.np_tot[IDIR]; i++) {
+          real r = d.x[IDIR](i);
+          real th = d.x[JDIR](j);
+          real z = r * cos(th);
+          real R = r * sin(th);
+          if (R > Rin) {
+            real Zh = FABS(z / R) / epsilonGlob;
+            real csdisk = epsilonGlob / sqrt(R);
+            real cs2 = csdisk * csdisk;
+            d.Vc(RHO, k, j, i) = 1.0 / (R * sqrt(R)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(R * R + z * z) - 1.0 / R));
+            d.Vc(VX3, k, j, i) = 1.0 / sqrt(R) * sqrt(FMAX(R / sqrt(R * R + z * z) - 2.5 * csdisk * csdisk, 0.0));
+            d.Vc(PRS, k, j, i) = cs2 * d.Vc(RHO, k, j, i);
+            if (std::isnan(d.Vc(VX3, k, j, i))) {
+              idfx::cout << "Nan in R>Rin at (i,j,k)=(" << i << "," << j << "," << k << "), (r,th,R,z)=(" << r << "," << th << "," << R << "," << z << ")" << std::endl;
+              IDEFIX_ERROR("Nan!s");
+            }
+          } else {
+            real Zh = FABS(z / Rin) / epsilonGlob;
+            real csdisk = epsilonGlob / sqrt(Rin);
+            real cs2 = csdisk * csdisk;
+            d.Vc(RHO, k, j, i) = 1.0 / (Rin * sqrt(Rin)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(Rin * Rin + z * z) - 1.0 / Rin));
+            d.Vc(VX3, k, j, i) = 1.0 / sqrt(Rin) * sqrt(FMAX(Rin / sqrt(Rin * Rin + z * z) - 2.5 * csdisk * csdisk, 0.0));
+            d.Vc(PRS, k, j, i) = cs2 * d.Vc(RHO, k, j, i);
+            if (std::isnan(d.Vc(VX3, k, j, i))) {
+              idfx::cout << "Nan in R<Rin at (i,j,k)=(" << i << "," << j << "," << k << "), (r,th,R,z)=(" << r << "," << th << "," << R << "," << z << ")" << std::endl;
+              IDEFIX_ERROR("Nan!s");
+            }
+          }
+
+          d.Vc(VX1, k, j, i) = ZERO_F;
+          d.Vc(VX2, k, j, i) = ZERO_F;
+
+          real densityFloor = computeDensityFloor(R, z, densityFloorGlob, Rin, epsilonGlob);
+          if (d.Vc(RHO, k, j, i) < densityFloor) {
+            d.Vc(RHO, k, j, i) = densityFloor;
+            // d.Vc(PRS,k,j,i) = T2*d.Vc(RHO,k,j,i);
+          }
+
+          // Vector potential on the corner
+          real s = sin(d.xl[JDIR](j));
+          R = d.xl[IDIR](i) * s;
+
+          A(IDIR, k, j, i) = ZERO_F;
+          A(JDIR, k, j, i) = ZERO_F;
+
+#ifdef EVOLVE_VECTOR_POTENTIAL
+          if (R > Rin) {
+            d.Ve(AX3e, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0) + Rin * Rin / (2.0 * R));
+          } else {
+            d.Ve(AX3e, k, j, i) = B0 * R / 2.0;
+          }
+#else
+          if (R > Rin) {
+            A(KDIR, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0));
+            A(KDIR, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0) + Rin * Rin / (2.0 * R));
+          } else {
+            A(KDIR, k, j, i) = B0 * R / 2.0;
+          }
+#endif
+        }
+      }
+    }
+
+// Make the field from the vector potential
+#ifndef EVOLVE_VECTOR_POTENTIAL
+    d.MakeVsFromAmag(A);
+#endif
+  }
   for (int k = 0; k < d.np_tot[KDIR]; k++) {
     for (int j = 0; j < d.np_tot[JDIR]; j++) {
       for (int i = 0; i < d.np_tot[IDIR]; i++) {
+        real R = d.x[IDIR](i);
+        real theta = d.x[JDIR](j);
+        for (int n = 0; n < data.dust.size(); n++) {
+          // d.dustVc[n](RHO, k, j, i) = 0.01 * sigma0;
+          real r0 = 5.0;
+          real Vk0 = 1 / sqrt(r0);
 
-        int iglob = i - 2 * d.beg[IDIR] + d.gbeg[IDIR];
-        int jglob = j - 2 * d.beg[JDIR] + d.gbeg[JDIR];
-        int kglob = k - 2 * d.beg[KDIR] + d.gbeg[KDIR];
-
-        d.Vc(RHO, k, j, i) = image.arrays["Vc-RHO"](kglob, jglob, iglob);
-        d.Vc(PRS, k, j, i) = image.arrays["Vc-PRS"](kglob, jglob, iglob);
-        d.Vc(VX1, k, j, i) = image.arrays["Vc-VX1"](kglob, jglob, iglob);
+          real z0 = 0.1;
+          real theta0 = acos(z0 / r0);
+          d.dustVc[n](RHO, k, j, i) = (1e-6 + 3e-3 * exp(-0.5 * (R - r0) * (R - r0) / (0.1 * 0.1))) * exp(-0.5 * (theta - theta0) * (theta - theta0) / (0.05 * 0.05));
+          d.dustVc[n](VX1, k, j, i) = 0.0;
+          d.dustVc[n](VX2, k, j, i) = 0.0;
+          d.dustVc[n](VX3, k, j, i) = Vk0;
+          if (std::isnan(d.dustVc[n](RHO, k, j, i))) {
+            idfx::cout << "Nan in R<Rin at (i,j,k)=(" << i << "," << j << "," << k << "), (T, theta)=(" << R << "," << theta << "," << R << ")" << std::endl;
+            IDEFIX_ERROR("Nan!s");
+          }
+        }
       }
     }
   }
 
-  for (int k = d.beg[KDIR]; k < d.end[KDIR]; k++) {
-    for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
-      for (int i = d.beg[IDIR]; i < d.end[IDIR] + IOFFSET; i++) {
-        int iglob = i - 2 * d.beg[IDIR] + d.gbeg[IDIR];
-        int jglob = j - 2 * d.beg[JDIR] + d.gbeg[JDIR];
-        int kglob = k - 2 * d.beg[KDIR] + d.gbeg[KDIR];
-        d.Vs(BX1s, k, j, i) = image.arrays["Vs-BX1s"](kglob, jglob, iglob);
-      }
-    }
-  }
   // for (int n = 0; n < d.PactiveCount; n++) {
   //   // d.dustVc[n](RHO, k, j, i) = (1e-5 + 3e-3 * exp(-0.5 * (R - 2.0) * (R - 2.0) / 0.1 / 0.1)) * d.Vc(RHO, k, j, i); //
   //   real z = 0.1;

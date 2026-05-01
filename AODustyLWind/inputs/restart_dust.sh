@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Slurm job options (job-name, compute nodes, job time)
-#SBATCH --job-name=testrestart_dust
+#SBATCH --job-name=restart_dust
 #SBATCH --time=04:00:00
 #SBATCH --partition=gpu
 #SBATCH --qos=dev
@@ -26,4 +26,4 @@ export OMP_PLACES=cores
 srun --nodes=1 --ntasks-per-node=2 \
      --hint=nomultithread  --distribution=block:block \
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \
-     /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/setup_l/idefix -dec 2 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/inputs/testrestart_dust.ini
+     /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/setup_l/idefix -restart -dec 2 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/inputs/restart_dust.ini
