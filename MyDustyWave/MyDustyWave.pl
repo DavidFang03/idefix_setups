@@ -19,7 +19,7 @@ sub format_time
     return %time;
 }
 
-my $minutes         = 20;
+my $minutes         = 4;
 my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
@@ -36,7 +36,7 @@ my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
-my $name            = "wave";
+my $name            = "dwave";
 
 my @mysubnames = ("n1");
 my @n = (1);
@@ -59,14 +59,14 @@ open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
-X1-grid    1    -0.5   128   u    0.5
+X1-grid    1    -0.5   1024   u    0.5
 X2-grid    1  -0.0125      1  u  0.0125
 X3-grid    1  -0.0125  1    u  0.0125
 
 [TimeIntegrator]
 CFL              0.8
 CFL_max_var      1.1
-tstop            130
+tstop            20
 first_dt         1.e-4
 nstages          2
 
@@ -84,13 +84,11 @@ bodyForce      userdef
 # drag             tau  1   0.2   0.04    # St=1, 0.2, 0.04
 # drag_feedback    no
 
-#[Particles]
-#count            per_proc  3
-#stopping_time    userdef
-#ParticleMass     3e-3
-#DustToGas        3e-3
-#fields_real      size
-## fields_real      t_stop
+[Particles]
+count            per_proc  1
+stopping_time    userdef
+ParticleMass     1e-3
+tau              1e-1
 
 
 [Boundary]
@@ -106,7 +104,7 @@ Sigma0      1
 n           $n[$index]
 
 [Output]
-vtk    2.0
+vtk    0.1
 dmp    100.0
 log        1000
 dmp_dir    $outputs_path_1

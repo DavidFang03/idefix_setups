@@ -1,5 +1,7 @@
-#define     COMPONENTS      3
-#define     DIMENSIONS      1
-#define     ISOTHERMAL
+#define COMPONENTS 3
+#define DIMENSIONS 1
+#define ISOTHERMAL
 
-#define     GEOMETRY        CARTESIAN
+#define GEOMETRY CARTESIAN
+
+#define DISABLE_PARTICLE_FEEDBACK
