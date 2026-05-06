@@ -35,18 +35,24 @@ def f(t, Y):
     return [dotx, doty, ddotx, ddoty]
 
 
+sol = solve_ivp(
+    f,
+    [0, 20],
+    [0, 0, 0, 0],
+    dense_output=True,
+    method="DOP853",
+    max_step=1e-3,
+).sol
+
+
 def predx(T):
     T = np.asarray(T)
-    sol = solve_ivp(
-        f,
-        [np.min(T), np.max(T)],
-        [0, 0, 0, 0],
-        dense_output=True,
-        method="DOP853",
-        max_step=1e-3,
-    ).sol
-
     return sol(T)[0, :]
+
+
+def diffx1(v):
+    data = v.data
+    return data["PART_X1"] - sol(v.t)[0]
 
 
 # print(predx(np.linspace(1, 10)))
@@ -72,6 +78,25 @@ pqs = [
         plot_coords=[0, 0],
         uids="all",
         ref_function=predx,
+        alpha=0.3,
+    ),
+    PartQuantity(
+        "PART_X1_diff",
+        r"$x^\mathrm{part}$",
+        plot_coords=[0, 0],
+        uids="all",
+        compute=diffx1,
+    ),
+]
+
+sps = [
+    SpaceTimeHeatmap(
+        "Dust0_RHO",
+        r"$\rho^\mathrm{dust}$",
+        uids="all",
+        compute=diffx1,
+        ymin=-0.002,
+        ymax=0.002,
     )
 ]
 
@@ -81,6 +106,6 @@ runContext = RunContext(
     partFolder="/home/dp316/dp316/dc-fang1/IdefixRuns/MyDustyWave/setup",
 )
 # pipeline = Pipeline(runContext, partQuantities=pqs, movies1D=custom_LineMovie1Ds)
-pipeline = Pipeline(runContext, partQuantities=pqs)
+pipeline = Pipeline(runContext, spaceTimeHeatmaps=sps, partQuantities=pqs)
 
 pipeline.run()

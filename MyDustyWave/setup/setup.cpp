@@ -122,6 +122,12 @@ void ParticleBodyForce(DataBlock &data, const real t, IdefixArray2D<real> &force
   idfx::popRegion();
 }
 
+void MyDrag(DataBlock *data, real beta, IdefixArray3D<real> &gamma) {
+  // Compute the drag coefficient gamma from the input beta
+  auto VcGas = data->hydro->Vc;
+  idefix_for("MyDrag", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) { gamma(k, j, i) = 1 / (beta * VcGas(RHO, k, j, i)); });
+}
+
 // Initialisation routine. Can be used to allocate
 // Arrays or variables which are used later on
 Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
@@ -139,6 +145,13 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   data.gravity->EnrollBodyForce(BodyForce);
   data.particles->EnrollStoppingTime(&UserdefStoppingTime);
   data.particles->EnrollBodyForce(ParticleBodyForce);
+
+  if (data.haveDust) {
+    int nSpecies = data.dust.size();
+    for (int n = 0; n < nSpecies; n++) {
+      data.dust[n]->drag->EnrollUserDrag(&MyDrag);
+    }
+  }
 }
 
 // This routine initialize the flow
@@ -163,6 +176,13 @@ void Setup::InitFlow(DataBlock &data) {
         d.Vc(VX1, k, j, i) = 1.0e-3 * sqrt(kappa * kappa + (kx * vs) * (kx * vs)) / kx * cos(kx * x);
         d.Vc(VX2, k, j, i) = shear * x + 1.0e-3 * (shear + 2 * Omega) / kx * sin(kx * x);
         d.Vc(VX3, k, j, i) = 0.0;
+
+        for (int n = 0; n < data.dust.size(); n++) {
+          d.dustVc[n](RHO, k, j, i) = 1e-6 + exp(-0.5 * x * x / (0.001 * 0.001));
+          d.dustVc[n](VX1, k, j, i) = 0.0;
+          d.dustVc[n](VX2, k, j, i) = shear * x;
+          d.dustVc[n](VX3, k, j, i) = 0.0;
+        }
       }
     }
   }

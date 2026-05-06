@@ -79,10 +79,10 @@ shearingBox    -1.5
 [Gravity]
 bodyForce      userdef
 
-# [Dust]
-# nSpecies         3
-# drag             tau  1   0.2   0.04    # St=1, 0.2, 0.04
-# drag_feedback    no
+[Dust]
+nSpecies         1
+drag             userdef   0.1    # tau
+drag_feedback    no
 
 [Particles]
 count            per_proc  1

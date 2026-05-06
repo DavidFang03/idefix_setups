@@ -17,7 +17,7 @@ custom_fields2D = [
         plot_coords=[0, 0],
         title="Density",
         streamlines=["VX1", "VX2"],
-        particles="all",
+        uids="all",
     ),
 ]
 
