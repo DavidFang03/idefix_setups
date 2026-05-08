@@ -114,7 +114,7 @@ reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reloa
 
 [Output]
 uservar    eta    Am    InvDt
-vtk        20.0
+vtk        2
 dmp_dir    $outputs_path_1
 dmp        200
 log        1000

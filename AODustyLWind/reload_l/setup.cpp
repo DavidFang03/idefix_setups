@@ -659,10 +659,8 @@ void Setup::InitFlow(DataBlock &data) {
     for (int j = 0; j < bunch && (i + j) < ntot; j++) {
       int n = i + j;
       real r = 2.0 + 10 * i / ntot;
-      // real r = 5.0;
-      // real theta = acos(z / r);
-      // real theta = d.x[JDIR](1);
-      real theta = 3.14 * (j + 0.5) / bunch;
+
+      real theta = (3.14 / 2.0) * (j + 0.5) / bunch;
 
       d.Ps(PX1, n) = r;
       d.Ps(PX2, n) = theta;
