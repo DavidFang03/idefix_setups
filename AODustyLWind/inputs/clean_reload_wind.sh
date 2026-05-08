@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Slurm job options (job-name, compute nodes, job time)
-#SBATCH --job-name=test_dustless
+#SBATCH --job-name=clean_reload_wind
 #SBATCH --time=04:00:00
 #SBATCH --partition=gpu
 #SBATCH --qos=dev
@@ -14,7 +14,7 @@
 
 #SBATCH --account=dp316
 
-cd /home/dp316/dp316/dc-fang1/IdefixRuns/AOWindDustyLWind/setup_l
+cd /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l
 # Load the correct modules for the run
 
 module load gcc/9.3.0
@@ -26,4 +26,4 @@ export OMP_PLACES=cores
 srun --nodes=1 --ntasks-per-node=1 \
      --hint=nomultithread  --distribution=block:block \
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \
-     /home/dp316/dp316/dc-fang1/IdefixRuns/AOWindDustyLWind/setup_l/idefix -dec 1 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AOWindDustyLWind/inputs/test_dustless.ini
+     /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/idefix -dec 1 1 -restart -i /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/inputs/clean_reload_wind.ini

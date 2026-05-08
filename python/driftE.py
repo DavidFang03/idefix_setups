@@ -20,10 +20,10 @@ class analytical_trajectory:
         }
 
     def __call__(self, t):
-        Stokes0 = self.tau
+        tau0 = self.tau
         z0 = 0.1
         r0 = 2
-        fluid = utilities.Fluid(0.05, -0.5, 0.125, -0.5, Stokes0=Stokes0, r0=r0, z0=z0)
+        fluid = utilities.Fluid(0.05, -0.5, 0.125, -0.5, tau0=tau0, r0=r0, z0=z0)
         return utilities.integrate(fluid.vrDrift, r0, t)
 
 

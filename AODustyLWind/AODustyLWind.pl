@@ -20,7 +20,7 @@ sub format_time
 }
 
 my $minutes         = 240;
-my $gpus            = 4;
+my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
 my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/IdefixGeoffroy";                            # The directory where calculations are run
@@ -32,12 +32,12 @@ my $qos             = "dev";
 my $nodes           = "1";
 my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
-my $setup_dir      = $folder_path."reload";
+my $setup_dir      = $folder_path."reload_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
 my $name            = "clean";
 
-my @mysubnames = ("wind");
+my @mysubnames = ("reload_wind");
 
 my @indexes = (0);
 
@@ -81,10 +81,10 @@ gamma        1.0001
 # drag             userdef  1   1e-4    # St=1, 0.2, 0.04
 # drag_feedback    no
 
-# [Particles]
-# count            per_proc  2
-# stopping_time    constant  1e-4
-# ParticleMass     3e-3
+[Particles]
+count            per_proc  20
+stopping_time    constant  1e-5
+ParticleMass     3e-3
 # DustToGas        3e-3
 
 
@@ -95,8 +95,8 @@ Mcentral     1.0
 [Boundary]
 X1-beg    userdef
 X1-end    userdef
-X2-beg    axis
-X2-end    axis
+X2-beg    userdef
+X2-end    userdef
 
 [Setup]
 Rm0                    10.0
@@ -110,11 +110,13 @@ Am                     1.0
 densityFloor           1.0e-7
 transitionSmoothing    0.5
 # fromDump               true
+reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind.0001.dmp
 
 [Output]
 uservar    eta    Am    InvDt
 vtk        20.0
 dmp_dir    $outputs_path_1
+dmp        200
 log        1000
 vtk_dir    $vtksdir1
 dat_path   $outputs_path_1/timevol.dat

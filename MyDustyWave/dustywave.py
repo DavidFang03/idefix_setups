@@ -9,16 +9,18 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/MyDustyWave"
-task = "dwave_n1"
+task = "dwave_n10"
 
 tau = 0.1
-n = 1
+n = 10
 Omega = 1
 S = 1.5
-kappa = 2 * Omega * (2 * Omega - S)
-kx = 2 * np.pi * n / 1
 vs = 1
+
+kx = 2 * np.pi * n / 1
+kappa = 2 * Omega * (2 * Omega - S)
 omega = np.sqrt(kappa**2 + (kx * vs) ** 2)
+tmax = 5
 
 
 def f(t, Y):
@@ -37,11 +39,14 @@ def f(t, Y):
 
 sol = solve_ivp(
     f,
-    [0, 20],
+    [0, tmax],
     [0, 0, 0, 0],
     dense_output=True,
-    method="DOP853",
-    max_step=1e-3,
+    method="LSODA",
+    # method="DOP853",
+    max_step=1e-3 / kx,
+    # atol=1e-9,
+    # rtol=1e-9,
 ).sol
 
 
@@ -53,6 +58,11 @@ def predx(T):
 def diffx1(v):
     data = v.data
     return data["PART_X1"] - sol(v.t)[0]
+
+
+def diffx1_relat(v):
+    data = v.data
+    return np.abs((data["PART_X1"] - sol(v.t)[0]) / sol(v.t)[0])
 
 
 # print(predx(np.linspace(1, 10)))
@@ -87,6 +97,13 @@ pqs = [
         uids="all",
         compute=diffx1,
     ),
+    PartQuantity(
+        "PART_X1_diff_relat",
+        r"$x^\mathrm{part}$",
+        plot_coords=[1, 0],
+        uids="all",
+        compute=diffx1_relat,
+    ),
 ]
 
 sps = [
@@ -105,7 +122,9 @@ runContext = RunContext(
     projectPath,
     partFolder="/home/dp316/dp316/dc-fang1/IdefixRuns/MyDustyWave/setup",
 )
-# pipeline = Pipeline(runContext, partQuantities=pqs, movies1D=custom_LineMovie1Ds)
-pipeline = Pipeline(runContext, spaceTimeHeatmaps=sps, partQuantities=pqs)
+pipeline = Pipeline(
+    runContext, spaceTimeHeatmaps=sps, partQuantities=pqs, movies1D=custom_LineMovie1Ds
+)
+# pipeline = Pipeline(runContext, spaceTimeHeatmaps=sps, partQuantities=pqs)
 
 pipeline.run()

@@ -18,6 +18,7 @@ real dtg;
 real PM;
 
 static std::string dat_path;
+static std::string reload_path;
 Analysis *analysis;
 
 KOKKOS_INLINE_FUNCTION real computeDensityFloor(real R, real z, real d_floor_0, real Rin, real c0) {
@@ -60,9 +61,9 @@ void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tst
   // DataBlockHost d(data);
   auto tstop_array = data.particles->pack->fields.GetField<real>("t_stop");
 
-  auto x1 = data->x[IDIR];
-  real dr_r = x1(1) - x1(0) / x1(0); // beurk
-  int i = round((ln(r) - ln(r0)) / ln(1 + dr_r));
+  // auto x1 = data->x[IDIR];
+  // real dr_r = x1(1) - x1(0) / x1(0); // beurk
+  // int i = round((ln(r) - ln(r0)) / ln(1 + dr_r));
   idefix_for(
       "StoppingTime", 0, data.particles->pack->maxActiveIndex + 1, KOKKOS_LAMBDA(int idx) {
         if (isActive(idx)) {
@@ -534,7 +535,7 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   data.hydro->EnrollUserSourceTerm(&MySourceTerm);
   data.hydro->EnrollInternalBoundary(&InternalBoundary);
   data.hydro->EnrollEmfBoundary(&EmfBoundary);
-  // data.particles->EnrollUserDefBoundary(&UserdefBoundaryParticles);
+  data.particles->EnrollUserDefBoundary(&UserdefBoundaryParticles);
 
   output.EnrollUserDefVariables(&ComputeUserVars);
   gammaGlob = data.hydro->eos->GetGamma();
@@ -548,7 +549,9 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   Rm0 = input.Get<real>("Setup", "Rm0", 0);
   etab0 = input.Get<real>("Setup", "etab0", 0);
 
-  // PM = input.Get<real>("Particles", "ParticleMass", 0);
+  reload_path = input.Get<std::string>("Setup", "reload_path", 0);
+
+  PM = input.Get<real>("Particles", "ParticleMass", 0);
   // dtg = input.Get<real>("Particles", "DustToGas", 0);
 
   dat_path = input.Get<std::string>("Output", "dat_path", 0);
@@ -567,17 +570,17 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
 void Setup::InitFlow(DataBlock &data) {
   // Create a host copy
   DataBlockHost d(data);
-  DumpImage image("dustless.dmp", &data);
+  DumpImage image(reload_path, &data);
   // Make vector potential
-  IdefixHostArray4D<real> A = IdefixHostArray4D<real>("Setup_VectorPotential", 3, data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
+  // IdefixHostArray4D<real> A = IdefixHostArray4D<real>("Setup_VectorPotential", 3, data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
 
-  real Rin = 1.0;
-  real m = -5.0 / 4.0;
-  real B0 = epsilonGlob * sqrt(2.0 / betaGlob);
+  // real Rin = 1.0;
+  // real m = -5.0 / 4.0;
+  // real B0 = epsilonGlob * sqrt(2.0 / betaGlob);
 
-  for (int k = 0; k < d.np_tot[KDIR]; k++) {
-    for (int j = 0; j < d.np_tot[JDIR]; j++) {
-      for (int i = 0; i < d.np_tot[IDIR]; i++) {
+  for (int k = d.beg[KDIR]; k < d.end[KDIR]; k++) {
+    for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
+      for (int i = d.beg[IDIR]; i < d.end[IDIR]; i++) {
 
         int iglob = i - 2 * d.beg[IDIR] + d.gbeg[IDIR];
         int jglob = j - 2 * d.beg[JDIR] + d.gbeg[JDIR];
@@ -586,6 +589,8 @@ void Setup::InitFlow(DataBlock &data) {
         d.Vc(RHO, k, j, i) = image.arrays["Vc-RHO"](kglob, jglob, iglob);
         d.Vc(PRS, k, j, i) = image.arrays["Vc-PRS"](kglob, jglob, iglob);
         d.Vc(VX1, k, j, i) = image.arrays["Vc-VX1"](kglob, jglob, iglob);
+        d.Vc(VX2, k, j, i) = image.arrays["Vc-VX2"](kglob, jglob, iglob);
+        d.Vc(VX3, k, j, i) = image.arrays["Vc-VX3"](kglob, jglob, iglob);
       }
     }
   }
@@ -600,8 +605,40 @@ void Setup::InitFlow(DataBlock &data) {
       }
     }
   }
+
+  for (int k = d.beg[KDIR]; k < d.end[KDIR]; k++) {
+    for (int j = d.beg[JDIR]; j < d.end[JDIR] + JOFFSET; j++) {
+      for (int i = d.beg[IDIR]; i < d.end[IDIR]; i++) {
+        int iglob = i - 2 * d.beg[IDIR] + d.gbeg[IDIR];
+        int jglob = j - 2 * d.beg[JDIR] + d.gbeg[JDIR];
+        int kglob = k - 2 * d.beg[KDIR] + d.gbeg[KDIR];
+        d.Vs(BX2s, k, j, i) = image.arrays["Vs-BX2s"](kglob, jglob, iglob);
+      }
+    }
+  }
+
+  // for (int k = d.beg[KDIR]; k < d.end[KDIR] + KOFFSET; k++) {
+  //   for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
+  //     for (int i = d.beg[IDIR]; i < d.end[IDIR]; i++) {
+  //       int iglob = i - 2 * d.beg[IDIR] + d.gbeg[IDIR];
+  //       int jglob = j - 2 * d.beg[JDIR] + d.gbeg[JDIR];
+  //       int kglob = k - 2 * d.beg[KDIR] + d.gbeg[KDIR];
+  //       d.Vs(BX3s, k, j, i) = image.arrays["Vs-BX3s"](kglob, jglob, iglob);
+  //     }
+  //   }
+  // }
+
+  // for (int k = d.beg[KDIR]; k < d.end[KDIR] + KOFFSET; k++) {
+  //   for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
+  //     for (int i = d.beg[IDIR]; i < d.end[IDIR]; i++) {
+  //       int iglob = i - d.beg[IDIR] + d.gbeg[IDIR];
+  //       int jglob = j - d.beg[JDIR] + d.gbeg[JDIR];
+  //       int kglob = k - d.beg[KDIR] + d.gbeg[KDIR];
+  //       d.Vs(BX3s, k, j, i) = image.arrays["Vs-BX3s"](kglob, jglob, iglob);
+  //     }
+  //   }
+  // }
   // for (int n = 0; n < d.PactiveCount; n++) {
-  //   // d.dustVc[n](RHO, k, j, i) = (1e-5 + 3e-3 * exp(-0.5 * (R - 2.0) * (R - 2.0) / 0.1 / 0.1)) * d.Vc(RHO, k, j, i); //
   //   real z = 0.1;
   //   real r = 5.0 + 10 * n / d.PactiveCount;
   //   real theta = acos(z / r);
@@ -614,6 +651,28 @@ void Setup::InitFlow(DataBlock &data) {
   //   d.Ps(PVX3, n) = Vk0;
   //   d.Ps(PMASS, n) = PM;
   // }
+
+  real ntot = d.PactiveCount;
+  real bunch = 5;
+
+  for (int i = 0; i < ntot; i += bunch) {
+    for (int j = 0; j < bunch && (i + j) < ntot; j++) {
+      int n = i + j;
+      real r = 2.0 + 10 * i / ntot;
+      // real r = 5.0;
+      // real theta = acos(z / r);
+      // real theta = d.x[JDIR](1);
+      real theta = 3.14 * (j + 0.5) / bunch;
+
+      d.Ps(PX1, n) = r;
+      d.Ps(PX2, n) = theta;
+      d.Ps(PX3, n) = 0.0;
+      d.Ps(PVX1, n) = 0.0;
+      d.Ps(PVX2, n) = 0.0;
+      d.Ps(PVX3, n) = 1 / sqrt(r);
+      d.Ps(PMASS, n) = PM;
+    }
+  }
 
   // Send it all, if needed
   d.SyncToDevice();

@@ -38,8 +38,8 @@ my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
 my $name            = "dwave";
 
-my @mysubnames = ("n1");
-my @n = (1);
+my @mysubnames = ("n10");
+my @n = (10);
 
 my @indexes = (0);
 
@@ -59,14 +59,14 @@ open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
-X1-grid    1    -0.5   1024   u    0.5
+X1-grid    1    -0.5   2048   u    0.5
 X2-grid    1  -0.0125      1  u  0.0125
 X3-grid    1  -0.0125  1    u  0.0125
 
 [TimeIntegrator]
 CFL              0.8
 CFL_max_var      1.1
-tstop            20
+tstop            5
 first_dt         1.e-4
 nstages          2
 
@@ -104,7 +104,7 @@ Sigma0      1
 n           $n[$index]
 
 [Output]
-vtk    0.1
+vtk    0.02
 dmp    100.0
 log        1000
 dmp_dir    $outputs_path_1
