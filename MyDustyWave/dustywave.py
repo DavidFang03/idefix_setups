@@ -9,10 +9,10 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/MyDustyWave"
-task = "dwave_n10"
+task = "dwave_n1"
 
 tau = 0.1
-n = 10
+n = 1
 Omega = 1
 S = 1.5
 vs = 1
@@ -68,6 +68,12 @@ def diffx1_relat(v):
 # print(predx(np.linspace(1, 10)))
 
 
+def vzdiff(v):
+    print(np.shape(v.data["VX3"]))
+    print(np.shape(v.x))
+    return v.data["VX3"] + S * v.x
+
+
 # custom_LineMovie1Ds = [
 #     SpaceTimeHeatmap("RHO", r"$\rho$", title="Density", plot_coords=[0, 0]),
 #     SpaceTimeHeatmap("VX1", r"$v_x$", plot_coords=[1, 0], uids="all"),
@@ -120,11 +126,9 @@ sps = [
 runContext = RunContext(
     task,
     projectPath,
-    partFolder="/home/dp316/dp316/dc-fang1/IdefixRuns/MyDustyWave/setup",
 )
-pipeline = Pipeline(
-    runContext, spaceTimeHeatmaps=sps, partQuantities=pqs, movies1D=custom_LineMovie1Ds
-)
+# pipeline = Pipeline(runContext, partQuantities=pqs, movies1D=custom_LineMovie1Ds)
+pipeline = Pipeline(runContext, partQuantities=pqs)
 # pipeline = Pipeline(runContext, spaceTimeHeatmaps=sps, partQuantities=pqs)
 
 pipeline.run()

@@ -1,16 +1,18 @@
 from idefix2python import RunContext, Pipeline, SpaceTimeHeatmap, PartQuantity
 import utilities
+from dotenv import load_dotenv
+import os
 
-projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift"
-task = "Drift_Size"
+load_dotenv()  # This loads variables from .env into os.environ
+RUNS_FOLDER_PATH = os.getenv("RUNS_FOLDER_PATH")
 
-
-# tau = 0.1
+projectPath = f"{RUNS_FOLDER_PATH}/ThomasDrift"
+task = "DriftL_2048_Size"
 
 
 class analytical_trajectory:
-    def __init__(self, tau):
-        self.tau = tau
+    def __init__(self, beta):
+        self.beta = beta
         self.plot_kwargs = {
             "ls": "--",
             "color": "white",
@@ -20,19 +22,29 @@ class analytical_trajectory:
         }
 
     def __call__(self, t):
-        tau0 = self.tau
-        z0 = 0.1
+        z0 = 0
         r0 = 2
-        fluid = utilities.Fluid(0.05, -0.5, 0.125, -0.5, tau0=tau0, r0=r0, z0=z0)
+        fluid = utilities.Fluid(
+            cs0=0.05,
+            csSlope=-0.5,
+            sigma0=0.125,
+            sigmaSlope=-0.5,
+            beta=self.beta,
+            r0=r0,
+            z0=z0,
+            drag="epstein",
+        )
         return utilities.integrate(fluid.vrDrift, r0, t)
 
 
 # def analytical_trajectory(t):
 
 custom_spaceTimeHeatmaps = []
-taus = [1, 0.1, 0.01]
-for uid in [0, 1, 2]:
-    tau = taus[uid]
+betas = [1, 0.1, 0.01]
+uids = [0, 1, 2]
+for ii in [0]:
+    uid = uids[ii]
+    beta = betas[ii]
     z_part = PartQuantity(
         "PART_X1",
         r"$r^\mathrm{part}$",
@@ -41,13 +53,13 @@ for uid in [0, 1, 2]:
     )
     custom_spaceTimeHeatmaps.append(
         SpaceTimeHeatmap(
-            f"Dust{uid}_RHO",
+            f"Dust{ii}_RHO",
             r"$\rho^\mathrm{dust}$",
-            plot_coords=[uid, 0],
-            title=rf"$\tau = {tau}$",
+            plot_coords=[ii, 0],
+            title=rf"$\beta \equiv s \rho^\mathrm{{part}} = {beta}$",
             cmap="inferno",
             norm="linear",
-            ref_function=analytical_trajectory(tau),
+            ref_function=analytical_trajectory(beta),
             uids=[uid],
         ),
     )
@@ -102,8 +114,6 @@ SpaceTimeHeatmap.suptitle = "Particle trajectory over gas density"
 runContext = RunContext(
     task,
     projectPath,
-    partFolder="/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/setup_l",
-    active_directions=[0],
 )
 pipeline = Pipeline(runContext, spaceTimeHeatmaps=custom_spaceTimeHeatmaps)
 

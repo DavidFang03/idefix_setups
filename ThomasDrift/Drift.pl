@@ -36,9 +36,9 @@ my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
-my $name            = "DriftL_2048_Epstein";
+my $name            = "DriftL_2048";
 
-my @mysubnames = ("Tau");
+my @mysubnames = ("Size");
 
 my @indexes = (0);
 
@@ -73,18 +73,15 @@ solver    hllc
 csiso     userdef
 # viscosity    explicit  userdef
 
-# [Dust]
-# nSpecies         3
-# drag             tau  1   0.2   0.04    # St=1, 0.2, 0.04
-# drag_feedback    no
+[Dust]
+nSpecies         3
+drag             userdef  1   0.2   0.04    # St=1, 0.2, 0.04
+drag_feedback    no
 
 [Particles]
 count            per_proc  3
-stopping_time    userdef
+stopping_time    size  1
 ParticleMass     3e-3
-DustToGas        3e-3
-fields_real      size
-# fields_real      t_stop
 
 [Gravity]
 potential    central 
@@ -106,7 +103,8 @@ h0            0.05
 alpha         1.0e-4
 
 [Output]
-vtk    2.0
+# uservar       st
+vtk    10.0
 dmp    100.0
 log        1000
 dmp_dir    $outputs_path_1

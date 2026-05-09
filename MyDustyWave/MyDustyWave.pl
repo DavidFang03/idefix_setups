@@ -38,10 +38,11 @@ my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
 my $name            = "dwave";
 
-my @mysubnames = ("n10");
-my @n = (10);
+my @mysubnames = ("n1", "n10");
+my @n = (1, 10);
+my @runtimes = (20, 5);
 
-my @indexes = (0);
+my @indexes = (0,1);
 
 # `mkdir -p $indir`;
 for my $index (@indexes) {
@@ -66,7 +67,7 @@ X3-grid    1  -0.0125  1    u  0.0125
 [TimeIntegrator]
 CFL              0.8
 CFL_max_var      1.1
-tstop            5
+tstop            $runtimes[$index]
 first_dt         1.e-4
 nstages          2
 

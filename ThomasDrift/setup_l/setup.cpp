@@ -11,7 +11,6 @@ real gammaGlob;
 real densityFloorGlob;
 real alphaGlob;
 
-real dtg;
 real PM;
 
 void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
@@ -24,64 +23,6 @@ void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
         cs(k, j, i) = h0 * pow(R, CsSlope);
       });
 }
-
-// drag coefficient assuming vertical hydrostatic equilirbium
-// And using the fact that Vc(RHO) is the surface density Sigma
-
-// Here, we start from the definition of the stopping time (see doc):
-// gamma_i = 1 / (tau_s * Sigma) = Omega / (St * Sigma)
-// by definition of the Stokes number (assuming Epstein)
-// St = Omega * taus = Omega * rho_s * a / (rho_mid * c_s)
-// Using the vertical equilibrium: rho_mid = Sigma/(sqrt(2pi)*h)
-// St = sqrt(2*pi) * rho_s a / Sigma
-// Hence the product St*Sigma is a constant for each specie.
-// We are free to define beta = St*Sigma/sigma0 so that gamma_i = Omega/(beta_i*sigma0)
-
-// In this setup, we assume Sigma = sigma0 @ R=1, so that St(R=1) = beta
-// Note that in this setup, sigma0 is entirely scale-free because there is no
-// gravitational interraction due to the gas.
-
-// Assuming Epstein drag and a disk with physical surface density Sigma_phys,
-// the particle size is related to beta through:
-// a = 20 cm *  beta * (Sigma_phys/100 g.cm^-2) / (rho_s / 2 g.cm^-3)
-// NB: checked against A. Johansen+ (2007)
-
-// void MyDrag(DataBlock *data, real beta, IdefixArray3D<real> &gamma) {
-//   // Compute the drag coefficient gamma from the input beta
-//   auto x1 = data->x[IDIR];
-//   real sigma0 = sigma0Glob;
-//   real sigmaSlope = sigmaSlopeGlob;
-//   //DataBlockHost d(data);
-
-//   idefix_for("MyDrag",0,data->np_tot[KDIR],0,data->np_tot[JDIR],0,data->np_tot[IDIR],
-//     KOKKOS_LAMBDA (int k, int j, int i) {
-//       real Omega = pow(x1(i),-1.5);
-//       real h0 = h0Glob;
-//       //gamma(k,j,i)=pow(x1(i),-CsSlopeGlob/2.0)/sigma0/beta;
-//       //gamma(k,j,i)=0.0;
-//       //gamma(k,j,i) = 1.0/(beta*sigma0*sqrt(x1(i)));
-//       //gamma(k,j,i) = 1/(beta*sigma0*pow(x1(i),-sigmaSlope-1)*exp(R*R/hg2*(1.0/sqrt(1.0+z*z/R/R)-1.0)));
-//       gamma(k,j,i) = 1/(beta*data->hydro->Vc(RHO,k,j,i));
-//       //gamma(k,j,i) = 1.0 / (beta*sigma0*pow(x1(i),-sigmaSlope-1));
-//       //gamma(k,j,i) = h0*0.0001 / (sigma0*pow(x1(i),-sigmaSlope-1)*beta);
-//     });
-// }
-
-// void MyDrag(DataBlock *data, int nSpecie, real beta, IdefixArray3D<real> &gamma) {
-//  Compute the drag coefficient gamma from the input beta
-//  auto VcGas = data->hydro->Vc;
-//  idefix_for("MyDrag", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) { gamma(k, j, i) = 1 / (beta * VcGas(RHO, k, j, i)); });
-//}
-
-// void MyDrag(DataBlock *data, int nSpecie, real beta, IdefixArray3D<real> &gamma) {
-//   // Compute the drag coefficient gamma from the input beta
-//   auto x1 = data->x[IDIR];
-//   real sigma0 = sigma0Glob;
-//   real CsSlope = CsSlopeGlob;
-//   IdefixArray4D<real> Vc = hydro->Vc;
-
-//   idefix_for("MyDrag", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) { gamma(k, j, i) = pow(x1(i), CsSlope) / sigma0 / beta; });
-// }
 
 // User-defined boundaries
 void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
@@ -194,58 +135,82 @@ void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tst
       });
 }
 
-// void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, real t) {
-//   IdefixArray4D<real> Vc = dust->Vc;
-//   auto data = dust->data;
-//   IdefixArray1D<real> x1 = data->x[IDIR];
-//   IdefixArray1D<real> x3 = data->x[KDIR];
-//   if (dir == IDIR) {
-//     int ighost, ibeg, iend;
-//     if (side == left) {
-//       ighost = data->beg[IDIR];
-//       ibeg = 0;
-//       iend = data->beg[IDIR];
-//       idefix_for(
-//           "UserDefBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
-//             real R = x1(i);
-//             real z = x3(k);
-//             real Vk = 1.0 / sqrt(R);
+void MyDrag(DataBlock *data, real beta, IdefixArray3D<real> &gamma) {
+  // Compute the drag coefficient gamma from the input beta
+  auto VcGas = data->hydro->Vc;
+  // auto VcDust = data->dust[nSpecie]->Vc;
+  // auto cs = data->hydro->cs;
+  IdefixArray1D<real> x1 = data->x[IDIR];
 
-//             Vc(RHO, k, j, i) = Vc(RHO, k, j, 2 * ighost - i + 1);
-//             if (Vc(VX1, k, j, i) >= ZERO_F) {
-//               Vc(VX1, k, j, ighost) = 0.0;
-//               // Vc(VX1,k,j,2*ighost - i +1)=0.0;
-//             } else {
-//               // Vc(VX1,k,j,i) = - Vc(VX1,k,j,2*ighost - i +1);
-//               Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
-//             }
-//             Vc(VX2, k, j, i) = Vk;
-//             Vc(VX3, k, j, i) = Vc(VX3, k, j, 2 * ighost - i + 1);
-//           });
-//     } else if (side == right) {
-//       ighost = data->end[IDIR] - 1;
-//       ibeg = data->end[IDIR];
-//       iend = data->np_tot[IDIR];
-//       idefix_for(
-//           "UserDefBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
-//             real R = x1(i);
-//             real z = x3(k);
-//             real Vk = 1.0 / sqrt(R);
+  real h0 = h0Glob;
+  real CsSlope = CsSlopeGlob;
 
-//             Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
-//             Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
-//             // if(Vc(VX1,k,j,ighost)<=ZERO_F){
-//             //   Vc(VX1,k,j,i) = 0.0;
-//             // }
-//             // if(Vc(VX1,k,j,i)<=ZERO_F){
-//             //   Vc(VX1,k,j,ighost) = 0.0;
-//             // }
-//             Vc(VX2, k, j, i) = Vk;
-//             Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
-//           });
-//     }
-//   }
-// }
+  idefix_for(
+      "MyDrag", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
+        // gamma(k, j, i) = 1 / (beta * VcGas(RHO, k, j, i));
+        // real cs = 1.0;
+        // real cs = sqrt(VcGas(PRS, k, j, i));
+        // real cs = sqrt(VcGas(PRS, k, j, i) / VcGas(RHO, k, j, i));
+        real R = x1(i);
+        real cs = h0 * pow(R, CsSlope);
+
+        // Epstein: beta = s*rhopart
+        // real tau = beta * VcDust(RHO, k, j, i) / (cs(k, j, i) * VcGas(RHO, k, j, i));
+        gamma(k, j, i) = cs / beta;
+      });
+}
+
+void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, real t) {
+  IdefixArray4D<real> Vc = dust->Vc;
+  auto data = dust->data;
+  IdefixArray1D<real> x1 = data->x[IDIR];
+  IdefixArray1D<real> x3 = data->x[KDIR];
+  if (dir == IDIR) {
+    int ighost, ibeg, iend;
+    if (side == left) {
+      ighost = data->beg[IDIR];
+      ibeg = 0;
+      iend = data->beg[IDIR];
+      idefix_for(
+          "UserDefBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
+            real R = x1(i);
+            real z = x3(k);
+            real Vk = 1.0 / sqrt(R);
+
+            Vc(RHO, k, j, i) = Vc(RHO, k, j, 2 * ighost - i - 1);
+            if (Vc(VX1, k, j, ighost) >= ZERO_F) {
+              Vc(VX1, k, j, i) = 0.0;
+            } else {
+              // Vc(VX1,k,j,i) = - Vc(VX1,k,j,2*ighost - i +1);
+              Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
+            }
+            Vc(VX2, k, j, i) = Vk;
+            Vc(VX3, k, j, i) = Vc(VX3, k, j, 2 * ighost - i - 1);
+          });
+    } else if (side == right) {
+      ighost = data->end[IDIR] - 1;
+      ibeg = data->end[IDIR];
+      iend = data->np_tot[IDIR];
+      idefix_for(
+          "UserDefBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
+            real R = x1(i);
+            real z = x3(k);
+            real Vk = 1.0 / sqrt(R);
+
+            Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
+            Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
+            if (Vc(VX1, k, j, ighost) <= ZERO_F) {
+              Vc(VX1, k, j, i) = 0.0;
+            }
+            // if(Vc(VX1,k,j,i)<=ZERO_F){
+            //   Vc(VX1,k,j,ighost) = 0.0;
+            // }
+            Vc(VX2, k, j, i) = Vk;
+            Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
+          });
+    }
+  }
+}
 
 // void userdefstoppingtime(DataBlock &data, const real t, IdefixArray1D<real> &tstop) {
 //   // a separate hook is needed for particles because gravity isn't in general
@@ -271,7 +236,14 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) // : m_p
   data.hydro->EnrollUserDefBoundary(&UserdefBoundary);
   data.hydro->EnrollIsoSoundSpeed(&MySoundSpeed);
   data.particles->EnrollUserDefBoundary(&UserdefBoundaryParticles);
-  data.particles->EnrollStoppingTime(&UserdefStoppingTime);
+  // data.particles->EnrollStoppingTime(&UserdefStoppingTime);
+  if (data.haveDust) {
+    int nSpecies = data.dust.size();
+    for (int n = 0; n < nSpecies; n++) {
+      data.dust[n]->EnrollUserDefBoundary(&UserdefBoundaryDust);
+      data.dust[n]->drag->EnrollUserDrag(&MyDrag);
+    }
+  }
 
   sigmaSlopeGlob = input.Get<real>("Setup", "sigmaSlope", 0);
   sigma0Glob = input.Get<real>("Setup", "sigma0", 0);
@@ -279,7 +251,6 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) // : m_p
   h0Glob = input.Get<real>("Setup", "h0", 0);
 
   PM = input.Get<real>("Particles", "ParticleMass", 0);
-  dtg = input.Get<real>("Particles", "DustToGas", 0);
 }
 
 // This routine initialize the flow
@@ -292,14 +263,10 @@ void Setup::InitFlow(DataBlock &data) {
 
   real h0 = h0Glob;
   real sigmaSlope = sigmaSlopeGlob;
-  // real sigma0 = sigma0Glob;
+  real sigma0 = sigma0Glob;
   // real PM = sigma0 * dtg / d.activeCount;
-  real sigma0 = PM / dtg * d.PactiveCount; // Not correct but not important
 
   real CsSlope = CsSlopeGlob;
-
-  auto size = d.Pfields.GetField<real>("size");
-  auto tstop_array = d.Pfields.GetField<real>("t_stop");
 
   for (int k = 0; k < d.np_tot[KDIR]; k++) {
     for (int j = 0; j < d.np_tot[JDIR]; j++) {
@@ -315,6 +282,13 @@ void Setup::InitFlow(DataBlock &data) {
         d.Vc(VX1, k, j, i) = 0.0;
         d.Vc(VX3, k, j, i) = 0.0;
         d.Vc(VX2, k, j, i) = Vk * (1 + 0.5 * (hg2 / R / R) * (sigmaSlope - 1.0 + 2 * CsSlope + 2 * CsSlope * z * z / 2.0 / hg2));
+
+        for (int n = 0; n < data.dust.size(); n++) {
+          d.dustVc[n](RHO, k, j, i) = (1e-5 + 3e-3 * exp(-0.5 * (R - 2.0) * (R - 2.0) / 0.05 / 0.05)) * d.Vc(RHO, k, j, i);
+          d.dustVc[n](VX1, k, j, i) = 0.0;
+          d.dustVc[n](VX2, k, j, i) = Vk;
+          d.dustVc[n](VX3, k, j, i) = 0.0;
+        }
       }
     }
   };
@@ -329,11 +303,7 @@ void Setup::InitFlow(DataBlock &data) {
     d.Ps(PVX2, n) = Vk0;
     d.Ps(PVX3, n) = 0.0;
     d.Ps(PMASS, n) = PM;
-    size(n) = pow(10.0, -n);
   }
-  printf("%f", tstop_array(0));
-  printf("%f", tstop_array(1));
-  printf("%f", tstop_array(2));
 
   // Send it all, if needed
   d.SyncToDevice();
