@@ -1,13 +1,14 @@
 # %%
-from .vtk_io import readVTK
+from idefix2python import readVTK
 import numpy as np
 import matplotlib.pyplot as plt
 
 # path = "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/outputs/Drift_Tau/vtks/data.0000.vtk"
-path = "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/setup_l/part.0000.vtk"
+# path = "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/setup_l/part.0000.vtk"
+path = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/outputs/reload_Epstein2_wind/vtks/part.0001.vtk"
 vtk = readVTK(path)
 data = vtk.data
-print(vtk.dimensions)
+# print(vtk.dimensions)
 print(vtk.geometry)
 print(vtk.z)
 
@@ -16,6 +17,8 @@ print(vtk.z)
 for key in data:
     print(key)
     print(np.shape(data[key]))
+
+print(data["TSTOP"])
 
 # print(vtk.geometry)
 

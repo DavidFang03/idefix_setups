@@ -35,15 +35,14 @@ my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."reload_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
-my $name            = "clean";
+my $name            = "r_Epstein_wind";
 
-my @mysubnames = ("reload_wind");
-
+my @sizes = (1e-6);
 my @indexes = (0);
 
 for my $index (@indexes) {
 print $index."\n";
-my $stringdx_1 = $name."_".$mysubnames[$index]; #OW_test
+my $stringdx_1 = $name."_".$sizes[$index]; #OW_test
 my $outputs_path_1 = $folder_path."outputs/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
 my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
 `mkdir -p $vtksdir1`;
@@ -76,14 +75,14 @@ resistivity  explicit  userdef
 gamma        1.0001
 
 
-# [Dust]
-# nSpecies         1
-# drag             userdef  1   1e-4    # St=1, 0.2, 0.04
-# drag_feedback    no
+[Dust]
+nSpecies         1
+drag             userdef  $sizes[$index] $sizes[$index] $sizes[$index] $sizes[$index] $sizes[$index]
+drag_feedback    no
 
 [Particles]
-count            per_proc  20
-stopping_time    constant  1e-5
+count            per_proc  1
+stopping_time    size  $sizes[$index]
 ParticleMass     3e-3
 # DustToGas        3e-3
 
@@ -114,7 +113,7 @@ reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reloa
 
 [Output]
 uservar    eta    Am    InvDt
-vtk        0.2
+vtk        1
 dmp_dir    $outputs_path_1
 dmp        200
 log        1000

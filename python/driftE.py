@@ -2,12 +2,15 @@ from idefix2python import RunContext, Pipeline, SpaceTimeHeatmap, PartQuantity
 import utilities
 from dotenv import load_dotenv
 import os
+from scipy.integrate import solve_ivp
+
 
 load_dotenv()  # This loads variables from .env into os.environ
 RUNS_FOLDER_PATH = os.getenv("RUNS_FOLDER_PATH")
 
 projectPath = f"{RUNS_FOLDER_PATH}/ThomasDrift"
-task = "DriftL_2048_Size"
+beta = 1e-2
+task = "DriftL_2048_Size1e-2_custom"
 
 
 class analytical_trajectory:
@@ -20,8 +23,6 @@ class analytical_trajectory:
             "alpha": 0.75,
             "label": "Predicted",
         }
-
-    def __call__(self, t):
         z0 = 0
         r0 = 2
         fluid = utilities.Fluid(
@@ -34,87 +35,52 @@ class analytical_trajectory:
             z0=z0,
             drag="epstein",
         )
-        return utilities.integrate(fluid.vrDrift, r0, t)
+        self.sol = solve_ivp(
+            fluid.vrDrift,
+            [0, 750],
+            [r0],
+            dense_output=True,
+            # method="LSODA",
+            method="DOP853",
+        ).sol
+
+    def __call__(self, t):
+        return self.sol(t)[0, :]
 
 
-# def analytical_trajectory(t):
+sol = analytical_trajectory(beta)
+
 
 custom_spaceTimeHeatmaps = []
-betas = [1, 0.1, 0.01]
-uids = [0, 1, 2]
-for ii in [0]:
-    uid = uids[ii]
-    beta = betas[ii]
-    z_part = PartQuantity(
-        "PART_X1",
-        r"$r^\mathrm{part}$",
+custom_spaceTimeHeatmaps.append(
+    SpaceTimeHeatmap(
+        f"Dust{0}_RHO",
+        r"$\rho^\mathrm{dust}$",
         plot_coords=[0, 0],
-        uids=[uid],
-    )
-    custom_spaceTimeHeatmaps.append(
-        SpaceTimeHeatmap(
-            f"Dust{ii}_RHO",
-            r"$\rho^\mathrm{dust}$",
-            plot_coords=[ii, 0],
-            title=rf"$\beta \equiv s \rho^\mathrm{{part}} = {beta}$",
-            cmap="inferno",
-            norm="linear",
-            ref_function=analytical_trajectory(beta),
-            uids=[uid],
-        ),
-    )
-
-# z_part1 = PartQuantity(
-#     "PART_X2",
-#     r"$r^\mathrm{part}$",
-#     plot_coords=[0, 1],
-# )
-
-# z_part2 = PartQuantity(
-#     "PART_X3",
-#     r"$r^\mathrm{part}$",
-#     plot_coords=[0, 2],
-# )
-
-
-#     SpaceTimeHeatmap(
-#     "RHO",
-#     r"$\rho^\mathrm{dust}$",
-#     plot_coords=[0, 0],
-#     title=r"$\tau = 1$",
-#     cmap="inferno",
-#     norm="log",
-#     ref_function=analytical_trajectory,
-#     trace_over=[z_part],
-# )
-# SpaceTimeHeatmap(
-#     "Dust0_RHO",
-#     r"$\rho^\mathrm{dust}$",
-#     plot_coords=[0, 1],
-#     title=r"$\tau = 0.2$",
-#     cmap="inferno",
-#     ref_function=get_analytical_trajectory(0.2),
-#     trace_over=[z_part],
-# ),
-# SpaceTimeHeatmap(
-#     "Dust0_RHO",
-#     r"$\rho^\mathrm{dust}$",
-#     plot_coords=[0, 2],
-#     title=r"$\tau = 0.04$",
-#     cmap="inferno",
-#     ref_function=get_analytical_trajectory(0.04),
-#     trace_over=[z_part],
-# ),
+        title=rf"$\beta \equiv s \rho^\mathrm{{part}} = {beta}$",
+        cmap="inferno",
+        norm="linear",
+        ref_function=sol,
+        uids="all",
+    ),
+)
 
 SpaceTimeHeatmap.suptitle = "Particle trajectory over gas density"
 
-# custom_partQuantities = [z_part]
+
+def diff(v):
+    return v.data["PART_X1"] - sol(v.t)
+
+
+z_part = PartQuantity("diffx", r"errors", plot_coords=[0, 0], compute=diff)
 
 
 runContext = RunContext(
     task,
     projectPath,
 )
-pipeline = Pipeline(runContext, spaceTimeHeatmaps=custom_spaceTimeHeatmaps)
+pipeline = Pipeline(
+    runContext, spaceTimeHeatmaps=custom_spaceTimeHeatmaps, partQuantities=[z_part]
+)
 
 pipeline.run()

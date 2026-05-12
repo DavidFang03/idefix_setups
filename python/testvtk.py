@@ -3,11 +3,12 @@ from .vtk_io import readVTK
 import numpy as np
 import matplotlib.pyplot as plt
 import glob
-# # path = "/home/dp316/dp316/dc-fang1/IdefixRuns/DriftSettling/outputs/DS_test/vtks/data.0000.vtk"
-# path = "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/outputs/Drift_l_Tau/vtks/part.0000.vtk"
-# vtk = readVTK(path)
-# data = vtk.data
 
+# # path = "/home/dp316/dp316/dc-fang1/IdefixRuns/DriftSettling/outputs/DS_test/vtks/data.0000.vtk"
+path = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/outputs/reload_Epstein2_wind/vtks/part.0000.vtk"
+vtk = readVTK(path)
+data = vtk.data
+print(data["TSTOP"])
 
 # for key in data:
 #     print(key)

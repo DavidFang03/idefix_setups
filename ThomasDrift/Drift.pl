@@ -38,7 +38,7 @@ my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
 my $name            = "DriftL_2048";
 
-my @mysubnames = ("Size");
+my @mysubnames = ("Size1e-2_custom");
 
 my @indexes = (0);
 
@@ -74,13 +74,13 @@ csiso     userdef
 # viscosity    explicit  userdef
 
 [Dust]
-nSpecies         3
-drag             userdef  1   0.2   0.04    # St=1, 0.2, 0.04
+nSpecies         1
+drag             userdef  0.01    # St=1, 0.2, 0.04
 drag_feedback    no
 
 [Particles]
-count            per_proc  3
-stopping_time    size  1
+count            per_proc  1
+stopping_time    userdef  0.01
 ParticleMass     3e-3
 
 [Gravity]

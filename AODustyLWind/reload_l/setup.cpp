@@ -372,6 +372,103 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
   }
 }
 
+void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, real t) {
+  IdefixArray4D<real> Vc = dust->Vc;
+  auto data = dust->data;
+  IdefixArray1D<real> x1 = data->x[IDIR];
+  if (dir == IDIR) {
+    int ighost, ibeg, iend;
+    if (side == left) {
+      ighost = data->beg[IDIR];
+      ibeg = 0;
+      iend = data->beg[IDIR];
+      idefix_for(
+          "UserDefBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
+            real R = x1(i);
+            real Vk = 1.0 / sqrt(R);
+
+            Vc(RHO, k, j, i) = Vc(RHO, k, j, 2 * ighost - i - 1);
+            if (Vc(VX1, k, j, ighost) >= ZERO_F) {
+              Vc(VX1, k, j, i) = 0.0;
+            } else {
+              Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
+            }
+            Vc(VX2, k, j, i) = Vk;
+            Vc(VX3, k, j, i) = Vc(VX3, k, j, 2 * ighost - i - 1);
+          });
+    } else if (side == right) {
+      ighost = data->end[IDIR] - 1;
+      ibeg = data->end[IDIR];
+      iend = data->np_tot[IDIR];
+      idefix_for(
+          "UserDefBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
+            real R = x1(i);
+            real Vk = 1.0 / sqrt(R);
+
+            Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
+            Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
+            if (Vc(VX1, k, j, ighost) <= ZERO_F) {
+              Vc(VX1, k, j, i) = 0.0;
+            }
+            Vc(VX2, k, j, i) = Vk;
+            Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
+          });
+    }
+  }
+
+  else if (dir == JDIR) {
+    int jghost, jbeg, jend;
+    if (side == left) {
+      jghost = data->beg[JDIR];
+      jbeg = 0;
+      jend = data->beg[JDIR];
+      idefix_for(
+          "UserDefBoundary", 0, data->np_tot[KDIR], jbeg, jend, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
+            real R = x1(i);
+            real Vk = 1.0 / sqrt(R);
+
+            Vc(RHO, k, j, i) = Vc(RHO, k, 2 * jghost - i - 1, i);
+            if (Vc(VX1, k, jghost, i) >= ZERO_F) {
+              Vc(VX1, k, j, i) = 0.0;
+            } else {
+              Vc(VX1, k, j, i) = Vc(VX1, k, jghost, i);
+            }
+            Vc(VX2, k, j, i) = Vk;
+            Vc(VX3, k, j, i) = Vc(VX3, k, 2 * jghost - i - 1, i);
+          });
+    } else if (side == right) {
+      jghost = data->end[JDIR] - 1;
+      jbeg = data->end[JDIR];
+      jend = data->np_tot[JDIR];
+      idefix_for(
+          "UserDefBoundary", 0, data->np_tot[KDIR], jbeg, jend, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
+            real R = x1(i);
+            real Vk = 1.0 / sqrt(R);
+
+            Vc(RHO, k, j, i) = Vc(RHO, k, jghost, i);
+            Vc(VX1, k, j, i) = Vc(VX1, k, jghost, i);
+            if (Vc(VX1, k, jghost, i) <= ZERO_F) {
+              Vc(VX1, k, j, i) = 0.0;
+            }
+            Vc(VX2, k, j, i) = Vk;
+            Vc(VX3, k, j, i) = Vc(VX3, k, jghost, i);
+          });
+    }
+  }
+}
+
+void MyDrag(DataBlock *data, real beta, IdefixArray3D<real> &gamma) {
+  // Compute the drag coefficient gamma from the input beta
+  auto VcGas = data->hydro->Vc;
+
+  idefix_for(
+      "MyDrag", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
+        // real cs = sqrt(VcGas(PRS, k, j, i) / VcGas(RHO, k, j, i));
+        real cs = 1.0;
+        gamma(k, j, i) = cs / beta;
+      });
+}
+
 void UserdefBoundaryParticles(DataBlock &data, real t, int dir, BoundarySide side) {
   idfx::pushRegion("UserdefBoundaryParticles");
   auto states = data.particles->pack->states;
@@ -537,6 +634,14 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   data.hydro->EnrollEmfBoundary(&EmfBoundary);
   data.particles->EnrollUserDefBoundary(&UserdefBoundaryParticles);
 
+  if (data.haveDust) {
+    int nSpecies = data.dust.size();
+    for (int n = 0; n < nSpecies; n++) {
+      data.dust[n]->EnrollUserDefBoundary(&UserdefBoundaryDust);
+      data.dust[n]->drag->EnrollUserDrag(&MyDrag);
+    }
+  }
+
   output.EnrollUserDefVariables(&ComputeUserVars);
   gammaGlob = data.hydro->eos->GetGamma();
   epsilonGlob = input.Get<real>("Setup", "epsilon", 0);
@@ -653,14 +758,14 @@ void Setup::InitFlow(DataBlock &data) {
   // }
 
   real ntot = d.PactiveCount;
-  real bunch = 5;
+  real bunch = 2;
 
-  for (int i = 0; i < ntot; i += bunch) {
-    for (int j = 0; j < bunch && (i + j) < ntot; j++) {
-      int n = i + j;
-      real r = 2.0 + 10 * i / ntot;
+  for (int ii = 0; ii < ntot; ii += bunch) {
+    for (int jj = 0; jj < bunch && (ii + jj) < ntot; jj++) {
+      int n = ii + jj;
+      real r = 2.5 + 10 * ii / ntot;
 
-      real theta = (3.14 / 2.0) * (j + 0.5) / bunch;
+      real theta = (3.14 / 2.0) * (jj + 0.5) / bunch;
 
       d.Ps(PX1, n) = r;
       d.Ps(PX2, n) = theta;
@@ -669,6 +774,25 @@ void Setup::InitFlow(DataBlock &data) {
       d.Ps(PVX2, n) = 0.0;
       d.Ps(PVX3, n) = 1 / sqrt(r);
       d.Ps(PMASS, n) = PM;
+
+      printf("dustsize: %f\n", data.dust.size());
+
+      // assuming Number of presuless fluids > nb of particles?
+      // if (n < data.dust.size()) {
+      //   for (int k = 0; k < d.np_tot[KDIR]; k++) {
+      //     for (int j = 0; j < d.np_tot[JDIR]; j++) {
+      //       for (int i = 0; i < d.np_tot[IDIR]; i++) {
+      //         real R = d.x[IDIR](i);
+      //         real Theta = d.x[JDIR](j);
+
+      //         d.dustVc[n](RHO, k, j, i) = (1e-5 + 3e-3 * exp(-0.5 * (R - r) * (R - r) / 0.05 / 0.05) * exp(-0.5 * (Theta - theta) * (Theta - theta) / 0.01 / 0.01)) * d.Vc(RHO, k, j, i);
+      //         d.dustVc[n](VX1, k, j, i) = 0.0;
+      //         d.dustVc[n](VX2, k, j, i) = 0.0;
+      //         d.dustVc[n](VX3, k, j, i) = 1 / sqrt(R);
+      //       }
+      //     }
+      //   }
+      // }
     }
   }
 

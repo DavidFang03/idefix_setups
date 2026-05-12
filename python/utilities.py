@@ -65,7 +65,7 @@ class Fluid:
         return tau * OmegaK
         # return tau0 * self.sigma0 * OmegaK / r ** (self.csSlope)
 
-    def vrDrift(self, r):
+    def vrDrift(self, t, r):
         st = self.Stokes(r)
         return self.eta(r) * vK(r) / (st + 1 / st)
 

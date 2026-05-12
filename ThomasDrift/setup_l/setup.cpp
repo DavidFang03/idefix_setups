@@ -117,24 +117,6 @@ void UserdefBoundaryParticles(DataBlock &data, real t, int dir, BoundarySide sid
   idfx::popRegion();
 }
 
-void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tstop) {
-  // a separate hook is needed for particles because gravity isn't in general
-  // computed at the same time for particles and the fluid.
-
-  // GPUS cannot capture static variables
-  // auto states = data.particles->pack->states;
-  auto isActive = data.particles->pack->isActive;
-  // DataBlockHost d(data);
-  auto tstop_array = data.particles->pack->fields.GetField<real>("t_stop");
-
-  idefix_for(
-      "StoppingTime", 0, data.particles->pack->maxActiveIndex + 1, KOKKOS_LAMBDA(int idx) {
-        if (isActive(idx)) {
-          tstop(idx) = tstop_array(idx);
-        }
-      });
-}
-
 void MyDrag(DataBlock *data, real beta, IdefixArray3D<real> &gamma) {
   // Compute the drag coefficient gamma from the input beta
   auto VcGas = data->hydro->Vc;
@@ -212,20 +194,64 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
   }
 }
 
-// void userdefstoppingtime(DataBlock &data, const real t, IdefixArray1D<real> &tstop) {
-//   // a separate hook is needed for particles because gravity isn't in general
-//   // computed at the same time for particles and the fluid.
+void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tstop) {
+  // a separate hook is needed for particles because gravity isn't in general
+  // computed at the same time for particles and the fluid.
 
-//   // GPUS cannot capture static variables
-//   auto states = data.particles->pack->states;
-//   auto isActive = data.particles->pack->isActive;
-//   idefix_for(
-//       "StoppingTime", 0, data.particles->pack->maxActiveIndex + 1, KOKKOS_LAMBDA(int idx) {
-//         if (isActive(idx)) {
-//           tstop(idx) = states(PX1, idx) * states(PX1, idx);
-//         }
-//       });
-// }
+  // GPUS cannot capture static variables
+  // auto states = data.particles->pack->states;
+  auto states = data.particles->pack->states;
+  auto isActive = data.particles->pack->isActive;
+
+  DataBlockHost d(data);
+
+  IdefixArray4D<real> Vc = data.hydro->Vc;
+
+  int i_gbeg = d.gbeg[IDIR];
+  int j_gbeg = d.gbeg[JDIR];
+  int ibeg = d.beg[IDIR];
+  int jbeg = d.beg[JDIR];
+  int iend = d.end[IDIR];
+  int kbeg = d.beg[KDIR];
+
+  real iint = d.np_int[IDIR];
+  real r_beg = d.x[IDIR](ibeg);
+  real r_end = d.x[IDIR](iend);
+  real dr = d.x[IDIR](ibeg + 1) - d.x[IDIR](ibeg);
+
+  // real theta_beg = d.x[JDIR](jbeg);
+  // real dtheta = d.x[JDIR](jbeg + 1) - d.x[JDIR](jbeg);
+  // real phi_beg = d.x[KDIR](kbeg);
+  // real dphi = d.x[KDIR](kbeg + 1) - d.x[KDIR](kbeg);
+
+  real sigma0 = sigma0Glob;
+  real sigmaSlope = sigmaSlopeGlob;
+  real h0 = h0Glob;
+  real CsSlope = CsSlopeGlob;
+
+  idefix_for(
+      "StoppingTime", 0, data.particles->pack->maxActiveIndex + 1, KOKKOS_LAMBDA(int idx) {
+        if (isActive(idx)) {
+
+          real r = states(PX1, idx);
+          real theta = states(PX2, idx);
+          real phi = states(PX3, idx);
+
+          // int i = floor(iint * (log(r / r_beg)) / log(r_end / r_beg)) + ibeg; //TODO SWITCH FOR LOG
+          int i = floor((r - r_beg) / dr) + ibeg;
+          // int j = floor((theta - theta_beg) / dtheta) + jbeg;
+          int j = jbeg;
+          // int k = floor((phi - phi_beg) / dphi) + kbeg;
+          int k = kbeg;
+
+          real beta = 0.01;
+          real cs = h0 * pow(r, CsSlope); // TODO change that for wind
+
+          // tstop(idx) = 1.0;
+          tstop(idx) = beta / (cs * Vc(RHO, kbeg, j, i));
+        }
+      });
+}
 
 // Default constructor
 // Initialisation routine. Can be used to allocate
@@ -236,7 +262,7 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) // : m_p
   data.hydro->EnrollUserDefBoundary(&UserdefBoundary);
   data.hydro->EnrollIsoSoundSpeed(&MySoundSpeed);
   data.particles->EnrollUserDefBoundary(&UserdefBoundaryParticles);
-  // data.particles->EnrollStoppingTime(&UserdefStoppingTime);
+  data.particles->EnrollStoppingTime(&UserdefStoppingTime);
   if (data.haveDust) {
     int nSpecies = data.dust.size();
     for (int n = 0; n < nSpecies; n++) {
