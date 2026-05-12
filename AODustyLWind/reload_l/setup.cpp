@@ -383,7 +383,7 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
       ibeg = 0;
       iend = data->beg[IDIR];
       idefix_for(
-          "UserDefBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
+          "UserDefBoundaryDustIleft", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
             real R = x1(i);
             real Vk = 1.0 / sqrt(R);
 
@@ -393,15 +393,15 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
             } else {
               Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
             }
-            Vc(VX2, k, j, i) = Vk;
-            Vc(VX3, k, j, i) = Vc(VX3, k, j, 2 * ighost - i - 1);
+            Vc(VX2, k, j, i) = Vc(VX2, k, j, 2 * ighost - i - 1);
+            Vc(VX3, k, j, i) = Vk;
           });
     } else if (side == right) {
       ighost = data->end[IDIR] - 1;
       ibeg = data->end[IDIR];
       iend = data->np_tot[IDIR];
       idefix_for(
-          "UserDefBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
+          "UserDefBoundaryDustIRight", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
             real R = x1(i);
             real Vk = 1.0 / sqrt(R);
 
@@ -410,8 +410,8 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
             if (Vc(VX1, k, j, ighost) <= ZERO_F) {
               Vc(VX1, k, j, i) = 0.0;
             }
-            Vc(VX2, k, j, i) = Vk;
-            Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
+            Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
+            Vc(VX3, k, j, i) = Vk;
           });
     }
   }
@@ -423,25 +423,25 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
       jbeg = 0;
       jend = data->beg[JDIR];
       idefix_for(
-          "UserDefBoundary", 0, data->np_tot[KDIR], jbeg, jend, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
+          "UserDefBoundaryDustJleft", 0, data->np_tot[KDIR], jbeg, jend, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
             real R = x1(i);
             real Vk = 1.0 / sqrt(R);
 
-            Vc(RHO, k, j, i) = Vc(RHO, k, 2 * jghost - i - 1, i);
+            Vc(RHO, k, j, i) = Vc(RHO, k, 2 * jghost - j - 1, i);
             if (Vc(VX1, k, jghost, i) >= ZERO_F) {
               Vc(VX1, k, j, i) = 0.0;
             } else {
               Vc(VX1, k, j, i) = Vc(VX1, k, jghost, i);
             }
-            Vc(VX2, k, j, i) = Vk;
-            Vc(VX3, k, j, i) = Vc(VX3, k, 2 * jghost - i - 1, i);
+            Vc(VX2, k, j, i) = Vc(VX2, k, 2 * jghost - j - 1, i);
+            Vc(VX3, k, j, i) = Vk;
           });
     } else if (side == right) {
       jghost = data->end[JDIR] - 1;
       jbeg = data->end[JDIR];
       jend = data->np_tot[JDIR];
       idefix_for(
-          "UserDefBoundary", 0, data->np_tot[KDIR], jbeg, jend, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
+          "UserDefBoundaryDustJRight", 0, data->np_tot[KDIR], jbeg, jend, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
             real R = x1(i);
             real Vk = 1.0 / sqrt(R);
 
@@ -450,8 +450,8 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
             if (Vc(VX1, k, jghost, i) <= ZERO_F) {
               Vc(VX1, k, j, i) = 0.0;
             }
-            Vc(VX2, k, j, i) = Vk;
-            Vc(VX3, k, j, i) = Vc(VX3, k, jghost, i);
+            Vc(VX2, k, j, i) = Vc(VX2, k, jghost, i);
+            Vc(VX3, k, j, i) = Vk;
           });
     }
   }
@@ -775,25 +775,33 @@ void Setup::InitFlow(DataBlock &data) {
       d.Ps(PVX3, n) = 1 / sqrt(r);
       d.Ps(PMASS, n) = PM;
 
-      printf("dustsize: %f\n", data.dust.size());
-
-      // assuming Number of presuless fluids > nb of particles?
-      // if (n < data.dust.size()) {
-      //   for (int k = 0; k < d.np_tot[KDIR]; k++) {
-      //     for (int j = 0; j < d.np_tot[JDIR]; j++) {
-      //       for (int i = 0; i < d.np_tot[IDIR]; i++) {
-      //         real R = d.x[IDIR](i);
-      //         real Theta = d.x[JDIR](j);
-
-      //         d.dustVc[n](RHO, k, j, i) = (1e-5 + 3e-3 * exp(-0.5 * (R - r) * (R - r) / 0.05 / 0.05) * exp(-0.5 * (Theta - theta) * (Theta - theta) / 0.01 / 0.01)) * d.Vc(RHO, k, j, i);
-      //         d.dustVc[n](VX1, k, j, i) = 0.0;
-      //         d.dustVc[n](VX2, k, j, i) = 0.0;
-      //         d.dustVc[n](VX3, k, j, i) = 1 / sqrt(R);
-      //       }
+      // printf("dustsize: %d\n", data.dust.size());
+      // for (int k = 0; k < d.np_tot[KDIR]; k++) {
+      //   for (int j = 0; j < d.np_tot[JDIR]; j++) {
+      //     for (int i = 0; i < d.np_tot[IDIR]; i++) {
+      //       d.dustVc[0](VX1, k, j, i) = 0.0;
       //     }
       //   }
       // }
+
+      // // assuming Number of presuless fluids > nb of particles?
+      if (n < data.dust.size()) {
+        for (int k = 0; k < d.np_tot[KDIR]; k++) {
+          for (int j = 0; j < d.np_tot[JDIR]; j++) {
+            for (int i = 0; i < d.np_tot[IDIR]; i++) {
+              real R = d.x[IDIR](i);
+              real Theta = d.x[JDIR](j);
+
+              d.dustVc[n](RHO, k, j, i) = (1e-5 + 3e-3 * exp(-0.5 * (R - r) * (R - r) / 0.05 / 0.05) * exp(-0.5 * (Theta - theta) * (Theta - theta) / 0.01 / 0.01)) * d.Vc(RHO, k, j, i);
+              d.dustVc[n](VX1, k, j, i) = 0.0;
+              d.dustVc[n](VX2, k, j, i) = 0.0;
+              d.dustVc[n](VX3, k, j, i) = 1 / sqrt(R);
+            }
+          }
+        }
+      }
     }
+    printf("init end");
   }
 
   // Send it all, if needed
