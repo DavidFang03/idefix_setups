@@ -37,7 +37,7 @@ my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
 my $name            = "r_Epstein_wind";
 
-my @sizes = (1e-6);
+my @sizes = ("1e-5");
 my @indexes = (0);
 
 for my $index (@indexes) {

@@ -255,7 +255,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
     IdefixArray1D<real> x2 = data->x[JDIR];
 
     int ighost = data->nghost[IDIR];
-    real Omega = 1.0;
+    real Omega = 1.0; // assuming Rin = 1.0
     real Rin = 1.0;
     real csdisk = epsilonGlob / sqrt(Rin);
     real cscorona = epsilonTopGlob / sqrt(Rin);
@@ -283,7 +283,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           Vc(VX3, k, j, i) = Omega * R;
           Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i);
         });
-    hydro->boundary->BoundaryForX2s("UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
+    hydro->boundary->BoundaryForX2s("UserDefX2s", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
   }
 
   if ((dir == IDIR) && (side == right)) {
@@ -316,9 +316,8 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           // z*z));
           Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
           Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i);
-          // Vc(BX3,k,j,i) = Vc(BX3,k,j,ighost);
         });
-    hydro->boundary->BoundaryForX2s("UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
+    hydro->boundary->BoundaryForX2s("UserDefX2s", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
   }
   if (dir == JDIR) {
     IdefixArray4D<real> Vc = hydro->Vc;
@@ -337,7 +336,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
             Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
             Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
-            Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i);
+            Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i); // https://github.com/idefix-code/idefix/issues/203
           });
 
       // Face-centered B field (BX2s)
@@ -346,7 +345,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           "UserDefX1_Left_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
             // Reflection across the face j_beg
             const int jrefl = 2 * j_beg - j;
-            Vs(BX1s, k, j, i) = -Vs(BX1s, k, jrefl, i);
+            Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
           });
     } else if (side == right) {
       // Cell-centered Loop
@@ -366,7 +365,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           "UserDefX1_Right_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
             // Reflection across the face j_end
             const int jrefl = 2 * j_end - j;
-            Vs(BX1s, k, j, i) = -Vs(BX1s, k, jrefl, i);
+            Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
           });
     }
   }
@@ -376,25 +375,26 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
   IdefixArray4D<real> Vc = dust->Vc;
   auto data = dust->data;
   IdefixArray1D<real> x1 = data->x[IDIR];
+  IdefixArray1D<real> x2 = data->x[JDIR];
   if (dir == IDIR) {
     int ighost, ibeg, iend;
     if (side == left) {
       ighost = data->beg[IDIR];
       ibeg = 0;
       iend = data->beg[IDIR];
+      real Omega = 1.0; // assuming Rin = 1.0
       idefix_for(
           "UserDefBoundaryDustIleft", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
-            real R = x1(i);
-            real Vk = 1.0 / sqrt(R);
+            real R = x1(i) * sin(x2(j));
 
-            Vc(RHO, k, j, i) = Vc(RHO, k, j, 2 * ighost - i - 1);
+            Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
             if (Vc(VX1, k, j, ighost) >= ZERO_F) {
-              Vc(VX1, k, j, i) = 0.0;
+              Vc(VX1, k, j, i) = -Vc(VX1, k, j, 2 * ighost - i);
             } else {
               Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
             }
-            Vc(VX2, k, j, i) = Vc(VX2, k, j, 2 * ighost - i - 1);
-            Vc(VX3, k, j, i) = Vk;
+            Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
+            Vc(VX3, k, j, i) = R * Omega;
           });
     } else if (side == right) {
       ighost = data->end[IDIR] - 1;
@@ -403,15 +403,14 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
       idefix_for(
           "UserDefBoundaryDustIRight", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
             real R = x1(i);
-            real Vk = 1.0 / sqrt(R);
 
             Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
-            Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
             if (Vc(VX1, k, j, ighost) <= ZERO_F) {
               Vc(VX1, k, j, i) = 0.0;
-            }
+            } else
+              Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
             Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
-            Vc(VX3, k, j, i) = Vk;
+            Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
           });
     }
   }
@@ -745,45 +744,51 @@ void Setup::InitFlow(DataBlock &data) {
   // }
 
   real ntot = d.PactiveCount;
-  real bunch = 2;
+  // real bunch = 2;
 
-  for (int ii = 0; ii < ntot; ii += bunch) {
-    for (int jj = 0; jj < bunch && (ii + jj) < ntot; jj++) {
-      int n = ii + jj;
-      real r = 2.5 + 10 * ii / ntot;
+  // for (int ii = 0; ii < ntot; ii += bunch) {
+  //   for (int jj = 0; jj < bunch && (ii + jj) < ntot; jj++) {
+  //     int n = ii + jj;
+  real r0 = 5.0;
 
-      real theta = (3.14 / 2.0) * (jj + 0.5) / bunch;
+  real theta0 = (3.14 / 3.0);
 
-      d.Ps(PX1, n) = r;
-      d.Ps(PX2, n) = theta;
-      d.Ps(PX3, n) = 0.0;
-      d.Ps(PVX1, n) = 0.0;
-      d.Ps(PVX2, n) = 0.0;
-      d.Ps(PVX3, n) = 1 / sqrt(r);
-      d.Ps(PMASS, n) = PM;
+  // printf("dustsize: %d\n", data.dust.size());
+  // for (int k = 0; k < d.np_tot[KDIR]; k++) {
+  //   for (int j = 0; j < d.np_tot[JDIR]; j++) {
+  //     for (int i = 0; i < d.np_tot[IDIR]; i++) {
+  //       d.dustVc[0](VX1, k, j, i) = 0.0;
+  //     }
+  //   }
+  // }
 
-      // printf("dustsize: %d\n", data.dust.size());
-      // for (int k = 0; k < d.np_tot[KDIR]; k++) {
-      //   for (int j = 0; j < d.np_tot[JDIR]; j++) {
-      //     for (int i = 0; i < d.np_tot[IDIR]; i++) {
-      //       d.dustVc[0](VX1, k, j, i) = 0.0;
-      //     }
-      //   }
-      // }
+  // // assuming Number of presuless fluids > nb of particles?
 
-      // // assuming Number of presuless fluids > nb of particles?
-      if (n == 10) {
-        for (int k = 0; k < d.np_tot[KDIR]; k++) {
-          for (int j = 0; j < d.np_tot[JDIR]; j++) {
-            for (int i = 0; i < d.np_tot[IDIR]; i++) {
-              real R = d.x[IDIR](i);
-              real Theta = d.x[JDIR](j);
+  for (int k = 0; k < d.np_tot[KDIR]; k++) {
+    for (int j = 0; j < d.np_tot[JDIR]; j++) {
+      for (int i = 0; i < d.np_tot[IDIR]; i++) {
+        real r = d.x[IDIR](i);
+        real theta = d.x[JDIR](j);
+        real R = r * sin(theta);
+        real dr = d.dx[IDIR](i);
+        real dtheta = d.dx[JDIR](j);
 
-              d.dustVc[0](RHO, k, j, i) = (1e-5 + 3e-3 * exp(-0.5 * (R - r) * (R - r) / 0.05 / 0.05) * exp(-0.5 * (Theta - theta) * (Theta - theta) / 0.01 / 0.01)) * d.Vc(RHO, k, j, i);
-              d.dustVc[0](VX1, k, j, i) = 0.0;
-              d.dustVc[0](VX2, k, j, i) = 0.0;
-              d.dustVc[0](VX3, k, j, i) = 1 / sqrt(R);
-            }
+        for (int n = 0; n < data.dust.size(); n++) {
+          d.dustVc[n](RHO, k, j, i) = (1e-5 + 1e-2 * exp(-0.5 * (r - r0) * (r - r0) / 0.05 / 0.05) * exp(-0.5 * (theta - theta0) * (theta - theta0) / 0.01 / 0.01));
+          d.dustVc[n](VX1, k, j, i) = 0.0;
+          d.dustVc[n](VX2, k, j, i) = 0.0;
+          d.dustVc[n](VX3, k, j, i) = R / pow(r, 1.5);
+        }
+
+        if (abs(r - r0) < dr and abs(theta - theta0) < dtheta) { // or maybe rather compare |R-r|, |Theta-theta| to dr, dtheta
+          for (int n = 0; n < d.PactiveCount; n++) {
+            d.Ps(PX1, n) = r;
+            d.Ps(PX2, n) = theta;
+            d.Ps(PX3, n) = 0;
+            d.Ps(PVX1, n) = d.Vc(VX1, k, j, i);
+            d.Ps(PVX2, n) = d.Vc(VX2, k, j, i);
+            d.Ps(PVX3, n) = d.Vc(VX3, k, j, i);
+            d.Ps(PMASS, n) = PM;
           }
         }
       }
