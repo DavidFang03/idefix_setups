@@ -14,8 +14,11 @@ real trSmoothingGlob;
 real Rm0;
 real etab0;
 
-real dtg;
-real PM;
+real rmin;
+real rmax;
+real thetamin;
+real thetamax;
+real bunch;
 
 static std::string dat_path;
 static std::string reload_path;
@@ -620,13 +623,13 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   data.hydro->EnrollEmfBoundary(&EmfBoundary);
   data.particles->EnrollUserDefBoundary(&UserdefBoundaryParticles);
 
-  if (data.haveDust) {
-    int nSpecies = data.dust.size();
-    for (int n = 0; n < nSpecies; n++) {
-      data.dust[n]->EnrollUserDefBoundary(&UserdefBoundaryDust);
-      data.dust[n]->drag->EnrollUserDrag(&MyDrag);
-    }
-  }
+  // if (data.haveDust) {
+  //   int nSpecies = data.dust.size();
+  //   for (int n = 0; n < nSpecies; n++) {
+  //     data.dust[n]->EnrollUserDefBoundary(&UserdefBoundaryDust);
+  //     data.dust[n]->drag->EnrollUserDrag(&MyDrag);
+  //   }
+  // }
 
   output.EnrollUserDefVariables(&ComputeUserVars);
   gammaGlob = data.hydro->eos->GetGamma();
@@ -642,8 +645,11 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
 
   reload_path = input.Get<std::string>("Setup", "reload_path", 0);
 
-  PM = input.Get<real>("Particles", "ParticleMass", 0);
-  // dtg = input.Get<real>("Particles", "DustToGas", 0);
+  bunch = input.Get<real>("Particles", "bunch", 0);
+  rmin = input.Get<real>("Particles", "rmin", 0);
+  rmax = input.Get<real>("Particles", "rmax", 0);
+  thetamin = input.Get<real>("Particles", "thetamin", 0);
+  thetamax = input.Get<real>("Particles", "thetamax", 0);
 
   dat_path = input.Get<std::string>("Output", "dat_path", 0);
   analysis = new Analysis(input, grid, data, output, dat_path);
@@ -708,27 +714,6 @@ void Setup::InitFlow(DataBlock &data) {
     }
   }
 
-  // for (int k = d.beg[KDIR]; k < d.end[KDIR] + KOFFSET; k++) {
-  //   for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
-  //     for (int i = d.beg[IDIR]; i < d.end[IDIR]; i++) {
-  //       int iglob = i - 2 * d.beg[IDIR] + d.gbeg[IDIR];
-  //       int jglob = j - 2 * d.beg[JDIR] + d.gbeg[JDIR];
-  //       int kglob = k - 2 * d.beg[KDIR] + d.gbeg[KDIR];
-  //       d.Vs(BX3s, k, j, i) = image.arrays["Vs-BX3s"](kglob, jglob, iglob);
-  //     }
-  //   }
-  // }
-
-  // for (int k = d.beg[KDIR]; k < d.end[KDIR] + KOFFSET; k++) {
-  //   for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
-  //     for (int i = d.beg[IDIR]; i < d.end[IDIR]; i++) {
-  //       int iglob = i - d.beg[IDIR] + d.gbeg[IDIR];
-  //       int jglob = j - d.beg[JDIR] + d.gbeg[JDIR];
-  //       int kglob = k - d.beg[KDIR] + d.gbeg[KDIR];
-  //       d.Vs(BX3s, k, j, i) = image.arrays["Vs-BX3s"](kglob, jglob, iglob);
-  //     }
-  //   }
-  // }
   // for (int n = 0; n < d.PactiveCount; n++) {
   //   real z = 0.1;
   //   real r = 5.0 + 10 * n / d.PactiveCount;
@@ -744,23 +729,17 @@ void Setup::InitFlow(DataBlock &data) {
   // }
 
   real ntot = d.PactiveCount;
-  // real bunch = 2;
 
-  // for (int ii = 0; ii < ntot; ii += bunch) {
-  //   for (int jj = 0; jj < bunch && (ii + jj) < ntot; jj++) {
-  //     int n = ii + jj;
-  real r0 = 5.0;
+  real rho0 = 6.0e-10;
+  real rhos = 1.0e3; // 1 g/cm3
+  real au = 1.5e11;
+  real sizemin = 0.1e-6;  // RD: 0.1 µm - 10µm
+  real sizemax = 10.0e-6; // RD: 0.1 µm - 10µm
+  real betamin = rhos * sizemin / (rho0 * au);
+  real betamax = rhos * sizemax / (rho0 * au);
 
-  real theta0 = (3.14 / 3.0);
-
-  // printf("dustsize: %d\n", data.dust.size());
-  // for (int k = 0; k < d.np_tot[KDIR]; k++) {
-  //   for (int j = 0; j < d.np_tot[JDIR]; j++) {
-  //     for (int i = 0; i < d.np_tot[IDIR]; i++) {
-  //       d.dustVc[0](VX1, k, j, i) = 0.0;
-  //     }
-  //   }
-  // }
+  printf("dust size range from: %.1e", betamin);
+  printf(" to: %.1e\n", betamax);
 
   // // assuming Number of presuless fluids > nb of particles?
 
@@ -773,22 +752,34 @@ void Setup::InitFlow(DataBlock &data) {
         real dr = d.dx[IDIR](i);
         real dtheta = d.dx[JDIR](j);
 
-        for (int n = 0; n < data.dust.size(); n++) {
-          d.dustVc[n](RHO, k, j, i) = (1e-5 + 1e-2 * exp(-0.5 * (r - r0) * (r - r0) / 0.05 / 0.05) * exp(-0.5 * (theta - theta0) * (theta - theta0) / 0.01 / 0.01));
-          d.dustVc[n](VX1, k, j, i) = 0.0;
-          d.dustVc[n](VX2, k, j, i) = 0.0;
-          d.dustVc[n](VX3, k, j, i) = R / pow(r, 1.5);
-        }
+        // for (int n = 0; n < data.dust.size(); n++) {
+        //   d.dustVc[n](RHO, k, j, i) = (1e-5 + 1e-2 * exp(-0.5 * (r - r0) * (r - r0) / 0.05 / 0.05) * exp(-0.5 * (theta - theta0) * (theta - theta0) / 0.01 / 0.01));
+        //   d.dustVc[n](VX1, k, j, i) = 0.0;
+        //   d.dustVc[n](VX2, k, j, i) = 0.0;
+        //   d.dustVc[n](VX3, k, j, i) = R / pow(r, 1.5);
+        // }
 
-        if (abs(r - r0) < dr and abs(theta - theta0) < dtheta) { // or maybe rather compare |R-r|, |Theta-theta| to dr, dtheta
-          for (int n = 0; n < d.PactiveCount; n++) {
-            d.Ps(PX1, n) = r;
-            d.Ps(PX2, n) = theta;
-            d.Ps(PX3, n) = 0;
-            d.Ps(PVX1, n) = d.Vc(VX1, k, j, i);
-            d.Ps(PVX2, n) = d.Vc(VX2, k, j, i);
-            d.Ps(PVX3, n) = d.Vc(VX3, k, j, i);
-            d.Ps(PMASS, n) = PM;
+        real bunch = 2;
+
+        for (int ii = 0; ii < ntot; ii += bunch) {
+          for (int jj = 0; jj < bunch && (ii + jj) < ntot; jj++) {
+            int n = ii + jj;
+            real r0 = rmin + (rmax - rmin) * ii / ntot;
+            real theta0 = thetamin + (thetamax - thetamin) * jj / bunch;
+
+            if (abs(r - r0) < dr && abs(theta - theta0) < dtheta) {
+              // for (int n = 0; n < d.PactiveCount; n++) {
+              d.Ps(PX1, n) = r;
+              d.Ps(PX2, n) = theta;
+              d.Ps(PX3, n) = 0;
+              d.Ps(PVX1, n) = d.Vc(VX1, k, j, i);
+              d.Ps(PVX2, n) = d.Vc(VX2, k, j, i);
+              d.Ps(PVX3, n) = d.Vc(VX3, k, j, i);
+              d.Ps(PMASS, n) = 1.0e-3;
+              // d.Ps(DRAGCOEFF, n) = 1.0e-6;
+              d.Ps(DRAGCOEFF, n) = betamin + ((betamax - betamin) * n) / d.PactiveCount;
+              // }
+            }
           }
         }
       }

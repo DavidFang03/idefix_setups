@@ -32,13 +32,13 @@ my $qos             = "dev";
 my $nodes           = "1";
 my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
-my $setup_dir      = $folder_path."setup_cleanwind";
+my $setup_dir      = $folder_path."reload_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
-my $name            = "clean_wind";
+my $name            = "dw";
 
 # my @sizes = ("1e-5");
-my @tasks = ("100");
+my @tasks = ("JL");
 my @indexes = (0);
 
 for my $index (@indexes) {
@@ -81,12 +81,16 @@ gamma        1.0001
 # drag             userdef
 # drag_feedback    no
 
-# [Particles]
-# count            per_proc  10
+[Particles]
+count            per_proc  10
 stopping_time    size
-# ParticleMass     3e-3
-# DustToGas        3e-3
-
+bunch              5
+thetamin           1.25
+thetamax           1.04
+rmin               2.0
+rmax               5.0
+sizemin            1e-3 # in m
+sizemax            1e-3 # in m
 
 [Gravity]
 potential    central

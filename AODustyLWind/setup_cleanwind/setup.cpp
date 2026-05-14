@@ -226,7 +226,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
     IdefixArray1D<real> x2 = data->x[JDIR];
 
     int ighost = data->nghost[IDIR];
-    real Omega = 1.0;
+    real Omega = 1.0; // assuming Rin = 1.0
     real Rin = 1.0;
     real csdisk = epsilonGlob / sqrt(Rin);
     real cscorona = epsilonTopGlob / sqrt(Rin);
@@ -254,7 +254,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           Vc(VX3, k, j, i) = Omega * R;
           Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i);
         });
-    hydro->boundary->BoundaryForX2s("UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
+    hydro->boundary->BoundaryForX2s("UserDefX2s", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
   }
 
   if ((dir == IDIR) && (side == right)) {
@@ -281,11 +281,14 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           else
             Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
           Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
+          // real Rmin = FMAX(0.3,R);
 
+          // Vc(VX3,k,j,i) = 1.0/sqrt(Rmin) * sqrt( Rmin / sqrt(Rmin*Rmin +
+          // z*z));
           Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
           Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i);
         });
-    hydro->boundary->BoundaryForX2s("UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
+    hydro->boundary->BoundaryForX2s("UserDefX2s", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
   }
   if (dir == JDIR) {
     IdefixArray4D<real> Vc = hydro->Vc;
@@ -298,12 +301,13 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
       // Cell-centered Loop
       idefix_for(
           "UserDefX2_Left_Vc", 0, data->np_tot[KDIR], 0, j_beg, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
+            // Reflection across the interface j_beg - 0.5
             const int jrefl = 2 * j_beg - 1 - j;
             Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
             Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
             Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
-            Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i);
+            Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i); // https://github.com/idefix-code/idefix/issues/203
           });
 
       // Face-centered B field (BX2s)
@@ -312,11 +316,13 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           "UserDefX1_Left_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
             // Reflection across the face j_beg
             const int jrefl = 2 * j_beg - j;
-            Vs(BX1s, k, j, i) = -Vs(BX1s, k, jrefl, i);
+            Vs(BX1s, k, j, i) = - Vs(BX1s, k, jrefl, i);
           });
     } else if (side == right) {
+      // Cell-centered Loop
       idefix_for(
           "UserDefX2_Right_Vc", 0, data->np_tot[KDIR], j_end, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
+            // Reflection across the interface j_end - 0.5
             const int jrefl = 2 * j_end - 1 - j;
             Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
@@ -328,8 +334,9 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
       // Face-centered B field (BX2s)
       hydro->boundary->BoundaryForX1s(
           "UserDefX1_Right_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
+            // Reflection across the face j_end
             const int jrefl = 2 * j_end - j;
-            Vs(BX1s, k, j, i) = -Vs(BX1s, k, jrefl, i);
+            Vs(BX1s, k, j, i) = - Vs(BX1s, k, jrefl, i);
           });
     }
   }

@@ -32,13 +32,13 @@ my $qos             = "dev";
 my $nodes           = "1";
 my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
-my $setup_dir      = $folder_path."setup_cleanwind";
+my $setup_dir      = $folder_path."reload_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
-my $name            = "clean_wind";
+my $name            = "dw100";
 
 # my @sizes = ("1e-5");
-my @tasks = ("100");
+my @tasks = ("RD");
 my @indexes = (0);
 
 for my $index (@indexes) {
@@ -81,12 +81,11 @@ gamma        1.0001
 # drag             userdef
 # drag_feedback    no
 
-# [Particles]
-# count            per_proc  10
+[Particles]
+count            per_proc  10
 stopping_time    size
-# ParticleMass     3e-3
-# DustToGas        3e-3
-
+theta0           0.1
+r0               1.36
 
 [Gravity]
 potential    central
@@ -110,7 +109,7 @@ Am                     1.0
 densityFloor           1.0e-7
 transitionSmoothing    0.5
 # fromDump               true
-reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind.0001.dmp
+reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind_100.0001.dmp
 
 [Output]
 uservar    eta    Am    InvDt
