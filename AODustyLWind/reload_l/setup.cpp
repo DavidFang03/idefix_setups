@@ -16,6 +16,8 @@ real etab0;
 
 real rmin;
 real rmax;
+real sizemin;
+real sizemax;
 real thetamin;
 real thetamax;
 real bunch;
@@ -650,6 +652,8 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   rmax = input.Get<real>("Particles", "rmax", 0);
   thetamin = input.Get<real>("Particles", "thetamin", 0);
   thetamax = input.Get<real>("Particles", "thetamax", 0);
+  sizemin = input.Get<real>("Particles", "sizemin", 0);
+  sizemax = input.Get<real>("Particles", "sizemax", 0);
 
   dat_path = input.Get<std::string>("Output", "dat_path", 0);
   analysis = new Analysis(input, grid, data, output, dat_path);
@@ -758,8 +762,6 @@ void Setup::InitFlow(DataBlock &data) {
         //   d.dustVc[n](VX2, k, j, i) = 0.0;
         //   d.dustVc[n](VX3, k, j, i) = R / pow(r, 1.5);
         // }
-
-        real bunch = 2;
 
         for (int ii = 0; ii < ntot; ii += bunch) {
           for (int jj = 0; jj < bunch && (ii + jj) < ntot; jj++) {

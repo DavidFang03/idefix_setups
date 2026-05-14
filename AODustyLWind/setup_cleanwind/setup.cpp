@@ -316,7 +316,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           "UserDefX1_Left_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
             // Reflection across the face j_beg
             const int jrefl = 2 * j_beg - j;
-            Vs(BX1s, k, j, i) = - Vs(BX1s, k, jrefl, i);
+            Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
           });
     } else if (side == right) {
       // Cell-centered Loop
@@ -336,7 +336,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           "UserDefX1_Right_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
             // Reflection across the face j_end
             const int jrefl = 2 * j_end - j;
-            Vs(BX1s, k, j, i) = - Vs(BX1s, k, jrefl, i);
+            Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
           });
     }
   }

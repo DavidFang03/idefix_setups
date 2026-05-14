@@ -3,7 +3,7 @@ import numpy as np
 
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind"
 configPath = "/home/dp316/dp316/dc-fang1/Idefix2Python/config/config.json"
-task = "r_Epstein_wind_1e-4"
+task = "dw100_RD"
 
 
 def z(v):
@@ -17,21 +17,7 @@ def St(v):
     return v.data["TSTOP"] * r ** (-1.5)
 
 
-def part_v(v):
-    return np.sqrt(v.data["VX1"] + v.data["VX2"] ** 2 + v.data["VX3"] ** 2)
-
-
 uids = "all"
-
-
-def compute_mach_p(data):
-    cs2 = data["PRS"] / data["RHO"]
-    return np.sqrt(data["VX1"] ** 2 + data["VX2"] ** 2) / cs2
-
-
-def compute_cs(data):
-    return np.sqrt(data["PRS"] / data["RHO"])
-
 
 quantities = [
     MapMovie2D(
@@ -42,15 +28,9 @@ quantities = [
         streamlines=["VX1", "VX2"],
         uids=uids,
     ),
-    MapMovie2D(
-        "Mach_p",
-        r"$\mathcal{M}_p$",
-        plot_coords=[1, 0],
-        title="Poloidal Mach Number",
-        compute=compute_mach_p,
-        contours=[1],
-        contour_color="green",
-    ),
+    # MapMovie2D(
+    #     "VX1", r"$v_x$", plot_coords=[1, 0], streamlines=["VX1", "VX2"], uids=uids
+    # ),
     MapMovie2D(
         "VX3", r"$v_\phi$", plot_coords=[2, 0], streamlines=["VX1", "VX2"], uids=uids
     ),
@@ -68,14 +48,6 @@ quantities = [
         streamlines=["BX1", "BX2"],
         uids=uids,
     ),
-    MapMovie2D(
-        "cs",
-        r"cs",
-        plot_coords=[0, 3],
-        streamlines=["VX1", "VX2"],
-        uids=uids,
-        compute=compute_cs,
-    ),
     # PartQuantity(
     #     "PART_X2",
     #     "PART_X2",
@@ -90,7 +62,6 @@ quantities = [
         uids=uids,
         plot_coords=[2, 1],
     ),
-    PartQuantity("PART_V", "PART_V", uids=uids, plot_coords=[1, 3], compute=part_v),
 ]
 fig1 = Fig(quantities)
 # fig1.axes[0, 0].xmin = 0

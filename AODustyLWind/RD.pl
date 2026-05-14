@@ -84,8 +84,13 @@ gamma        1.0001
 [Particles]
 count            per_proc  10
 stopping_time    size
-theta0           0.1
-r0               1.36
+bunch            1.0
+thetamin           1.36
+thetamax           1.36
+rmin               3.0
+rmax               3.0
+sizemin            0.1e-6 # in m
+sizemax            10.0e-6 # in m
 
 [Gravity]
 potential    central
@@ -113,7 +118,7 @@ reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reloa
 
 [Output]
 uservar    eta    Am    InvDt
-vtk        20.0
+vtk        1.0
 dmp_dir    $outputs_path_1
 dmp        200
 log        1000
