@@ -31,12 +31,12 @@ quantities = [
         streamlines=["BX1", "BX2"],
     ),
 ]
-# fig1 = Fig(quantities)
-fig1 = Fig(
-    [
-        MapMovie2D("InvDt", plot_coords=[0, 0], streamlines=["VX1", "VX2"]),
-    ]
-)
+fig1 = Fig(quantities)
+# fig1 = Fig(
+#     [
+#         MapMovie2D("InvDt", plot_coords=[0, 0], streamlines=["VX1", "VX2"]),
+#     ]
+# )
 # fig1.axes[0, 0].xmin = 0
 
 
