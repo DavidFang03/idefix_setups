@@ -310,19 +310,14 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
             Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i); // https://github.com/idefix-code/idefix/issues/203
           });
 
-      // Face-centered B field (BX2s)
-      // For side == left, the loop covers j from 0 to j_beg (inclusive of the boundary face)
       hydro->boundary->BoundaryForX1s(
           "UserDefX1_Left_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-            // Reflection across the face j_beg
-            const int jrefl = 2 * j_beg - j;
+            const int jrefl = 2 * j_beg - 1 - j;
             Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
           });
     } else if (side == right) {
-      // Cell-centered Loop
       idefix_for(
           "UserDefX2_Right_Vc", 0, data->np_tot[KDIR], j_end, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-            // Reflection across the interface j_end - 0.5
             const int jrefl = 2 * j_end - 1 - j;
             Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
@@ -331,11 +326,9 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
             Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i);
           });
 
-      // Face-centered B field (BX2s)
       hydro->boundary->BoundaryForX1s(
           "UserDefX1_Right_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-            // Reflection across the face j_end
-            const int jrefl = 2 * j_end - j;
+            const int jrefl = 2 * j_end - 1 - j;
             Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
           });
     }
@@ -354,12 +347,12 @@ void EmfBoundary(DataBlock &data, const real t) {
   }
   // additional zero EMF on the boundary
   if (data.lbound[JDIR] == axis || data.lbound[JDIR] == userdef) {
-    int jghost = data.beg[JDIR];
-    idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int i) { Ex3(k, jghost, i) = ZERO_F; });
+    int jref = data.beg[JDIR];
+    idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int i) { Ex3(k, jref, i) = ZERO_F; });
   }
   if (data.rbound[JDIR] == axis || data.rbound[JDIR] == userdef) {
-    int jghost = data.end[JDIR];
-    idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int i) { Ex3(k, jghost, i) = ZERO_F; });
+    int jref = data.end[JDIR];
+    idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int i) { Ex3(k, jref, i) = ZERO_F; });
   }
 }
 

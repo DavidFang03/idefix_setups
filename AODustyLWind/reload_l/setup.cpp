@@ -344,19 +344,14 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
             Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i); // https://github.com/idefix-code/idefix/issues/203
           });
 
-      // Face-centered B field (BX2s)
-      // For side == left, the loop covers j from 0 to j_beg (inclusive of the boundary face)
       hydro->boundary->BoundaryForX1s(
           "UserDefX1_Left_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-            // Reflection across the face j_beg
-            const int jrefl = 2 * j_beg - j;
+            const int jrefl = 2 * j_beg - 1 - j;
             Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
           });
     } else if (side == right) {
-      // Cell-centered Loop
       idefix_for(
           "UserDefX2_Right_Vc", 0, data->np_tot[KDIR], j_end, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-            // Reflection across the interface j_end - 0.5
             const int jrefl = 2 * j_end - 1 - j;
             Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
@@ -365,11 +360,9 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
             Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i);
           });
 
-      // Face-centered B field (BX2s)
       hydro->boundary->BoundaryForX1s(
           "UserDefX1_Right_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-            // Reflection across the face j_end
-            const int jrefl = 2 * j_end - j;
+            const int jrefl = 2 * j_end - 1 - j;
             Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
           });
     }
@@ -554,12 +547,10 @@ void EmfBoundary(DataBlock &data, const real t) {
   // additional zero EMF on the boundary
   if (data.lbound[JDIR] == axis || data.lbound[JDIR] == userdef) {
     int jghost = data.beg[JDIR];
-    // printf("I'mbeing called\n");
     idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int i) { Ex3(k, jghost, i) = ZERO_F; });
   }
   if (data.rbound[JDIR] == axis || data.rbound[JDIR] == userdef) {
     int jghost = data.end[JDIR];
-    // printf("I'mbeing called\n");
     idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int i) { Ex3(k, jghost, i) = ZERO_F; });
   }
 }
@@ -692,6 +683,7 @@ void Setup::InitFlow(DataBlock &data) {
         d.Vc(VX1, k, j, i) = image.arrays["Vc-VX1"](kglob, jglob, iglob);
         d.Vc(VX2, k, j, i) = image.arrays["Vc-VX2"](kglob, jglob, iglob);
         d.Vc(VX3, k, j, i) = image.arrays["Vc-VX3"](kglob, jglob, iglob);
+        d.Vc(BX3, k, j, i) = image.arrays["Vc-BX3"](kglob, jglob, iglob);
       }
     }
   }
@@ -717,6 +709,17 @@ void Setup::InitFlow(DataBlock &data) {
       }
     }
   }
+
+  // for (int k = d.beg[KDIR]; k < d.end[KDIR] + KOFFSET; k++) {
+  //   for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
+  //     for (int i = d.beg[IDIR]; i < d.end[IDIR]; i++) {
+  //       int iglob = i - 2 * d.beg[IDIR] + d.gbeg[IDIR];
+  //       int jglob = j - 2 * d.beg[JDIR] + d.gbeg[JDIR];
+  //       int kglob = k - 2 * d.beg[KDIR] + d.gbeg[KDIR];
+  //       d.Vs(BX3s, k, j, i) = image.arrays["Vc-BX3"](kglob, jglob, iglob);
+  //     }
+  //   }
+  // }
 
   // for (int n = 0; n < d.PactiveCount; n++) {
   //   real z = 0.1;

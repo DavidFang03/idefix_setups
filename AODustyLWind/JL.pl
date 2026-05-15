@@ -82,13 +82,13 @@ gamma        1.0001
 # drag_feedback    no
 
 [Particles]
-count            per_proc  10
+count            per_proc  20
 stopping_time    size
 bunch              5
-thetamin           1.25
-thetamax           1.04
+thetamin           1.04
+thetamax           1.5 # for h = 0.05, 4h is at theta=pi/2-pi/16 = 1.37
 rmin               2.0
-rmax               5.0
+rmax               6.0
 sizemin            1e-3 # in m
 sizemax            1e-3 # in m
 
@@ -114,13 +114,13 @@ Am                     1.0
 densityFloor           1.0e-7
 transitionSmoothing    0.5
 # fromDump               true
-reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind.0001.dmp
+reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind.0002.dmp
 
 [Output]
 uservar    eta    Am    InvDt
-vtk        20.0
+vtk        1.0
 dmp_dir    $outputs_path_1
-dmp        200
+dmp        100
 log        1000
 vtk_dir    $vtksdir1
 dat_path   $outputs_path_1/timevol.dat

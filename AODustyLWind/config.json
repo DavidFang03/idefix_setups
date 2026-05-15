@@ -1,0 +1,116 @@
+{
+    "BX1": {
+        "bounds": [
+            -1e-4,
+            1e-4
+        ],
+        "symbol": "$B_r$"
+    },
+    "BX2": {
+        "bounds": [
+            -1e-4,
+            1e-4
+        ],
+        "symbol": "$B_\\theta$"
+    },
+    "BX3": {
+        "bounds": [
+            -1e-3,
+            1e-3
+        ],
+        "symbol": "$B_\\phi$"
+    },
+    "VX1": {
+        "norm": "TwoSlopeNorm",
+        "cmap": "RdBu_r",
+        "symbol": "$v_r$"
+    },
+    "Dust0_VX1": {
+        "norm": "TwoSlopeNorm",
+        "cmap": "RdBu_r"
+    },
+    "VX2": {
+        "bounds": [
+            -0.5,
+            0.5
+        ],
+        "symbol": "$v_\\theta$"
+    },
+    "VX3": {
+        "bounds": [
+            0,
+            0.5
+        ],
+        "style_kwargs": {
+            "cmap": "inferno"
+        },
+        "symbol": "$v_\\phi$"
+    },
+    "cs": {
+        "norm": "log"
+    },
+    "RHO": {
+        "norm": "log",
+        "bounds": [
+            1e-7,
+            1
+        ],
+        "style_kwargs": {
+            "cmap": "inferno"
+        },
+        "symbol": "$\\rho$",
+        "title": "Gas Density"
+    },
+    "Mach_p": {
+        "bounds": [
+            0.1,
+            20
+        ],
+        "style_kwargs": {
+            "cmap": "cool"
+        },
+        "norm": "log"
+    },
+    "Am": {
+        "style_kwargs": {
+            "cmap": "inferno"
+        }
+    },
+    "InvDt": {
+        "style_kwargs": {
+            "cmap": "inferno"
+        },
+        "symbol": "$\\mathrm{d}t^{-1}$"
+    },
+    "eta": {
+        "style_kwargs": {
+            "cmap": "cool"
+        },
+        "norm": "log"
+    },
+    "Dust0_VX2": {
+        "bounds": [
+            -0.5,
+            0.5
+        ]
+    },
+    "Dust0_VX3": {
+        "bounds": [
+            0,
+            0.5
+        ],
+        "style_kwargs": {
+            "cmap": "inferno"
+        }
+    },
+    "Dust0_RHO": {
+        "norm": "log",
+        "bounds": [
+            1e-7,
+            1
+        ],
+        "style_kwargs": {
+            "cmap": "inferno"
+        }
+    }
+}

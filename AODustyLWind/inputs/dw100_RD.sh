@@ -26,4 +26,4 @@ export OMP_PLACES=cores
 srun --nodes=1 --ntasks-per-node=1 \
      --hint=nomultithread  --distribution=block:block \
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \
-     /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/idefix -dec 1 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/inputs/dw100_RD.ini
+     /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/idefix -dec 1 1 -restart -i /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/inputs/dw100_RD.ini
