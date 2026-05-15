@@ -23,9 +23,9 @@ my $minutes         = 240;
 my $gpus            = 4;
 
 my %time_results    = format_time($minutes);
-my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/IdefixGeoffroy";                            # The directory where calculations are run
+my $IDEFIX_DIR      = "/home/dfang/Code/Lidefix";                            # The directory where calculations are run
 my $folder_name     = "Test_Epstein";
-my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
+my $folder_path     = "/home/dfang/Code/idefix_setups/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
 my $qos             = "dev";
@@ -35,7 +35,7 @@ my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
-my $name            = "test";
+my $name            = "cflgrav";
 
 my @mysubnames = ("");
 

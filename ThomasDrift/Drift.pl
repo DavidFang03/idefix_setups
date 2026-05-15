@@ -38,7 +38,7 @@ my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
 my $name            = "DriftL";
 
-my @mysubnames = ("Size");
+my @mysubnames = ("Size_CFLg");
 
 my @indexes = (0);
 
@@ -64,7 +64,7 @@ X3-grid    1  -0.0125  1    u  0.0125
 
 [TimeIntegrator]
 CFL         0.5
-tstop       750
+tstop       1000
 first_dt    1.0e-5
 nstages     2
 
@@ -73,18 +73,16 @@ solver    hllc
 csiso     userdef
 # viscosity    explicit  userdef
 
-# [Dust]
-# nSpecies         3
-# drag             userdef  1   0.1  0.01    # St=1, 0.2, 0.04
-# drag_feedback    no
+[Dust]
+nSpecies         3
+drag             userdef  1   0.1  0.01    # St=1, 0.2, 0.04
+drag_feedback    no
 
 [Particles]
 count            per_proc  3
-stopping_time    userdef
-ParticleMass     3e-3
-DustToGas        3e-3
-fields_real      betas
-# fields_real      t_stop
+stopping_time    size
+sizemin          1.0e-4
+sizemax          1.0e-2
 
 [Gravity]
 potential    central 
@@ -106,7 +104,7 @@ h0            0.05
 alpha         1.0e-4
 
 [Output]
-uservar       st
+# uservar       st
 vtk    10.0
 dmp    100.0
 log        1000

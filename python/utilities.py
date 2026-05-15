@@ -65,9 +65,9 @@ class Fluid:
         return tau * OmegaK
         # return tau0 * self.sigma0 * OmegaK / r ** (self.csSlope)
 
-    def vrDrift(self, r):
+    def vrDrift(self, t, r):
         st = self.Stokes(r)
-        return self.eta(r) * vK(r) / (st + 1 / st)
+        return self.eta(r) * vK(r) * st / (1.0 + st**2)
 
     def vzSettling_approx(self, z):
         r = 2.0
