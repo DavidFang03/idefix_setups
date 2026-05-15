@@ -791,6 +791,8 @@ void Setup::InitFlow(DataBlock &data) {
     }
   }
 
+  // delete image;
+
   // Send it all, if needed
   d.SyncToDevice();
 }

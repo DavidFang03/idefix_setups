@@ -2,7 +2,7 @@ from idefix2python import RunContext, Pipeline, MapMovie2D, Fig
 
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind"
 configPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/config.json"
-task = "clean_wind"
+task = "dw_JL"
 
 
 quantities = [

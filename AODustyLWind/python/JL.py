@@ -3,7 +3,7 @@ import numpy as np
 
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind"
 configPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/config.json"
-task = "dw100_RD"
+task = "dw_JL"
 
 
 def z(v):
