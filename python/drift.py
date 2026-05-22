@@ -1,7 +1,7 @@
 from idefix2python import RunContext, Pipeline, SpaceTimeHeatmap, PartQuantity
 import utilities
 
-projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift"
+projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift"
 task = "Drift_Tau"
 
 
@@ -104,7 +104,7 @@ SpaceTimeHeatmap.suptitle = "Particle trajectory over gas density"
 runContext = RunContext(
     task,
     projectPath,
-    partFolder="/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/setup_l",
+    partFolder="/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/setup_l",
     active_directions=[0],
 )
 pipeline = Pipeline(runContext, spaceTimeHeatmaps=custom_spaceTimeHeatmaps)

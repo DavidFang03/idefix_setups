@@ -1,7 +1,7 @@
 from idefix2python import RunContext, Pipeline, PartQuantity
 import utilities
 
-projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift"
+projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift"
 task = "DriftL_Tau"
 
 
@@ -21,7 +21,7 @@ custom_partQuantities = [
 runContext = RunContext(
     task,
     projectPath,
-    partFolder="/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/setup_l",
+    partFolder="/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/setup_l",
 )
 pipeline = Pipeline(
     runContext,

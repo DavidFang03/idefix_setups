@@ -3,8 +3,8 @@ from idefix2python import readVTK
 import numpy as np
 import matplotlib.pyplot as plt
 
-# path = "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/outputs/Drift_Tau/vtks/data.0000.vtk"
-# path = "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/setup_l/part.0000.vtk"
+# path = "/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/outputs/Drift_Tau/vtks/data.0000.vtk"
+# path = "/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/setup_l/part.0000.vtk"
 path = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/outputs/reload_Epstein2_wind/vtks/part.0001.vtk"
 vtk = readVTK(path)
 data = vtk.data
@@ -31,7 +31,7 @@ print(data["TSTOP"])
 # import glob
 
 # for path in glob.glob(
-#     "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/outputs/Drift_Tau/vtks/*.vtk"
+#     "/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/outputs/Drift_Tau/vtks/*.vtk"
 # ):
 #     print(path)
 #     vtk = readVTK(path)
@@ -40,7 +40,7 @@ print(data["TSTOP"])
 #     # plt.savefig("test.png")
 
 # v = readVTK(
-#     "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/outputs/Drift_Tau/vtks/data.0000.vtk"
+#     "/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/outputs/Drift_Tau/vtks/data.0000.vtk"
 # )
 # plt.plot(v.x, v.data["RHO"][:, :, 0])
 

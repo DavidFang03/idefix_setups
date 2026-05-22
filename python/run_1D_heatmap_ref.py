@@ -1,7 +1,7 @@
 from idefix2python import RunContext, Pipeline, SpaceTimeHeatmap
 import utilitaries
 
-projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift"
+projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift"
 configPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/Idefix2Python/config/config.json"
 task = "Drift_Tau"
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Slurm job options (job-name, compute nodes, job time)
-#SBATCH --job-name=DriftL_Tau
+#SBATCH --job-name=DriftL_2048_Size1e-2_custom
 #SBATCH --time=00:20:00
 #SBATCH --partition=gpu
 #SBATCH --qos=dev
@@ -14,7 +14,7 @@
 
 #SBATCH --account=dp316
 
-cd /home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/setup_l
+cd /home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/setup_l
 # Load the correct modules for the run
 
 module load gcc/9.3.0
@@ -26,4 +26,4 @@ export OMP_PLACES=cores
 srun --nodes=1 --ntasks-per-node=1 \
      --hint=nomultithread  --distribution=block:block \
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \
-     /home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/setup_l/idefix -dec 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/ThomasDrift/inputs/DriftL_Tau.ini
+     /home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/setup_l/idefix -dec 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/inputs/DriftL_2048_Size1e-2_custom.ini

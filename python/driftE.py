@@ -8,7 +8,7 @@ from scipy.integrate import solve_ivp
 load_dotenv()  # This loads variables from .env into os.environ
 RUNS_FOLDER_PATH = os.getenv("RUNS_FOLDER_PATH")
 
-projectPath = f"{RUNS_FOLDER_PATH}/ThomasDrift"
+projectPath = f"{RUNS_FOLDER_PATH}/RadialDrift"
 beta = 1e-2
 task = "DriftL_2048_Size1e-2_custom"
 
