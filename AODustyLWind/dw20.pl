@@ -23,7 +23,7 @@ my $minutes         = 240;
 my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
-my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/IdefixGeoffroy";                            # The directory where calculations are run
+my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/Lidefix";                            # The directory where calculations are run
 my $folder_name     = "AODustyLWind";
 my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
@@ -38,7 +38,7 @@ my $options         = "-dec $gpus 1";
 my $name            = "clean_wind";
 
 # my @sizes = ("1e-5");
-my @tasks = ("100");
+my @tasks = ("20_b1e4");
 my @indexes = (0);
 
 for my $index (@indexes) {
@@ -57,14 +57,13 @@ open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
-X1-grid    1  1.0  768  l   100.0
+X1-grid    1  1.0  512  l   20.0
 X2-grid    3  0.0  256   u  1.28   96  u  1.861592653589  256  u  3.141592653589793
 # X2-grid    1  0.0  1024  u  3.141592653589793
 
 [TimeIntegrator]
 CFL            0.9
-tstop          500.0
-# tstop            1000.0
+tstop          10000.0
 first_dt       1.e-6
 nstages        2
 max_runtime    $idefix_limit
@@ -83,7 +82,7 @@ gamma        1.0001
 
 # [Particles]
 # count            per_proc  10
-stopping_time    size
+# stopping_time    size
 # ParticleMass     3e-3
 # DustToGas        3e-3
 
@@ -95,14 +94,14 @@ Mcentral     1.0
 [Boundary]
 X1-beg    userdef
 X1-end    userdef
-X2-beg    userdef
-X2-end    userdef
+X2-beg    axis
+X2-end    axis
 
 [Setup]
 Rm0                    10.0
 etab0                  1.0
 epsilon                0.05
-beta                   1000
+beta                   1.0e4
 # beta->10000?
 epsilonTop             0.3
 Hideal                 5.0

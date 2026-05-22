@@ -19,16 +19,16 @@ sub format_time
     return %time;
 }
 
-my $minutes         = 240;
+my $minutes         = 960;
 my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
-my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/IdefixGeoffroy";                            # The directory where calculations are run
+my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/Lidefix";                            # The directory where calculations are run
 my $folder_name     = "AODustyLWind";
 my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
-my $qos             = "dev";
+my $qos             = "standard";
 my $nodes           = "1";
 my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
@@ -38,7 +38,7 @@ my $options         = "-dec $gpus 1";
 my $name            = "dw";
 
 # my @sizes = ("1e-5");
-my @tasks = ("JL");
+my @tasks = ("JL_b1e3_s1e-4_zero");
 my @indexes = (0);
 
 for my $index (@indexes) {
@@ -83,13 +83,13 @@ gamma        1.0001
 [Particles]
 count            per_proc  20
 stopping_time    size
-bunch              5
+sameradius              5
 thetamin           1.04
 thetamax           1.5 # for h = 0.05, 4h is at theta=pi/2-pi/16 = 1.37
 rmin               2.0
 rmax               6.0
-sizemin            1e-3 # in m
-sizemax            1e-3 # in m
+sizemin            1e-6 # in m
+sizemax            1e-6 # in m
 
 [Gravity]
 potential    central
@@ -113,13 +113,13 @@ Am                     1.0
 densityFloor           1.0e-7
 transitionSmoothing    0.5
 # fromDump               true
-reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind_t1000.dmp
+reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind_20_b1e3_t1000.dmp
 
 [Output]
 uservar    eta    Am    InvDt
 vtk        5.0
 dmp_dir    $outputs_path_1
-dmp        40
+dmp        50
 log        1000
 vtk_dir    $vtksdir1
 dat_path   $outputs_path_1/timevol.dat

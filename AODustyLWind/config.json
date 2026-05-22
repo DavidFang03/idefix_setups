@@ -22,12 +22,21 @@
     },
     "VX1": {
         "norm": "TwoSlopeNorm",
-        "cmap": "RdBu_r",
-        "symbol": "$v_r$"
+        "style_kwargs": {
+            "cmap": "RdBu_r",
+            "alpha": 0.2
+        },
+        "symbol": "$v_r$",
+        "bounds": [
+            -0.2,
+            0.2
+        ]
     },
     "Dust0_VX1": {
         "norm": "TwoSlopeNorm",
-        "cmap": "RdBu_r"
+        "style_kwargs": {
+            "cmap": "RdBu_r"
+        }
     },
     "VX2": {
         "bounds": [
@@ -62,6 +71,7 @@
         "title": "Gas Density"
     },
     "Mach_p": {
+        "symbol": "$\\mathcal{M}_p$",
         "bounds": [
             0.1,
             20

@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Slurm job options (job-name, compute nodes, job time)
-#SBATCH --job-name=clean_reload_wind
-#SBATCH --time=04:00:00
+#SBATCH --job-name=dw100_b1e4_1000p_tv
+#SBATCH --time=16:00:00
 #SBATCH --partition=gpu
-#SBATCH --qos=dev
+#SBATCH --qos=standard
 
 # Request right number of full nodes (48 cores by node for A100-80 GPU nodes))
 #SBATCH --nodes=1
@@ -26,4 +26,4 @@ export OMP_PLACES=cores
 srun --nodes=1 --ntasks-per-node=1 \
      --hint=nomultithread  --distribution=block:block \
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \
-     /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/idefix -dec 1 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/inputs/clean_reload_wind.ini
+     /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/idefix -dec 1 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/inputs/dw100_b1e4_1000p_tv.ini

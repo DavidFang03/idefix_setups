@@ -19,7 +19,7 @@ sub format_time
     return %time;
 }
 
-my $minutes         = 960;
+my $minutes         = 920;
 my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
@@ -32,14 +32,13 @@ my $qos             = "standard";
 my $nodes           = "1";
 my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
-my $setup_dir      = $folder_path."reload_l";
+my $setup_dir      = $folder_path."setup_cleanwind";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
-my $name            = "dw100";
+my $name            = "clean_wind";
 
 # my @sizes = ("1e-5");
-my @tasks = ("RD_b1e4");
-my @betas = ("1e4");
+my @tasks = ("100_b1e4");
 my @indexes = (0);
 
 for my $index (@indexes) {
@@ -64,8 +63,7 @@ X2-grid    3  0.0  256   u  1.28   96  u  1.861592653589  256  u  3.141592653589
 
 [TimeIntegrator]
 CFL            0.9
-tstop          3000.0
-# tstop            1000.0
+tstop          10000.0
 first_dt       1.e-6
 nstages        2
 max_runtime    $idefix_limit
@@ -82,16 +80,12 @@ gamma        1.0001
 # drag             userdef
 # drag_feedback    no
 
-[Particles]
-count            per_proc  10
-stopping_time    size
-bunch            1.0
-thetamin           1.37 # for h = 0.05, 4h is at theta=pi/2-pi/16 = 1.37
-thetamax           1.37
-rmin               9.0
-rmax               9.0
-sizemin            0.1e-6 # in m
-sizemax            10.0e-6 # in m
+# [Particles]
+# count            per_proc  10
+# stopping_time    size
+# ParticleMass     3e-3
+# DustToGas        3e-3
+
 
 [Gravity]
 potential    central
@@ -107,7 +101,7 @@ X2-end    userdef
 Rm0                    10.0
 etab0                  1.0
 epsilon                0.05
-beta                   $betas[$index]
+beta                   1e4
 # beta->10000?
 epsilonTop             0.3
 Hideal                 5.0
@@ -115,11 +109,11 @@ Am                     1.0
 densityFloor           1.0e-7
 transitionSmoothing    0.5
 # fromDump               true
-reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind_100_b$betas[$index]_t3000.dmp
+reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind.0001.dmp
 
 [Output]
 uservar    eta    Am    InvDt
-vtk        2.0
+vtk        50.0
 dmp_dir    $outputs_path_1
 dmp        200
 log        1000

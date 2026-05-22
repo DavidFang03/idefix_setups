@@ -1,25 +1,34 @@
-from idefix2python import RunContext, Pipeline, MapMovie2D, PartQuantity, Fig
+from idefix2python import (
+    RunContext,
+    Pipeline,
+    MapMovie2D,
+    PartQuantity,
+    Fig,
+    OneComponentOneVariable,
+)
 import numpy as np
 
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind"
 configPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/config.json"
-task = "dw_JL_b1e3_s1e-4_tv"
+task = "dw_L_vs_F"
 
 
-# def z(v):
-#     # r = v.data["PART_X1"]
-#     # theta = v.data["PART_X2"]
-#     r = v.r
-#     theta = v.theta
-#     return r * np.cos(theta)
+def z(v):
+    r = v.data["PART_X1"]
+    theta = v.data["PART_X2"]
+    return r * np.cos(theta)
 
 
 def St(v):
     return v.data["TSTOP"] * v.data["PART_X1"] ** (-1.5)
 
 
-def rhovr(v):
-    return v.data["RHO"] * v.data["VX1"]
+def max_gaussian(v):
+    xgrid, zgrid = np.meshgrid(v.r, v.theta)
+    max_coords = np.unravel_index(
+        np.argmax(v.data["Dust0_RHO"]), np.shape(v.data["Dust0_RHO"])
+    )
+    return xgrid[*max_coords]
 
 
 uids = "all"
@@ -29,6 +38,11 @@ quantities = [
         "RHO",
         plot_coords=[0, 1],
         streamlines=["VX1", "VX2"],
+    ),
+    MapMovie2D(
+        "Dust0_RHO",
+        plot_coords=[0, 3],
+        streamlines=["Dust0_VX1", "Dust0_VX2"],
     ),
     MapMovie2D("InvDt", plot_coords=[0, 0], streamlines=["VX1", "VX2"]),
     MapMovie2D("VX1", plot_coords=[1, 0], streamlines=["VX1", "VX2"]),
@@ -57,28 +71,13 @@ quantities = [
         uids=uids,
         plot_coords=[2, 2],
     ),
-    PartQuantity(
-        "PART_VX1",
-        r"$v_r^\mathrm{d}$",
-        uids=uids,
-        plot_coords=[0, 3],
+    OneComponentOneVariable(
+        "maxgaussian", r"$r^\mathrm{fluid}$", plot_coords=[1, 3], compute=max_gaussian
     ),
-    PartQuantity(
-        "PART_VX2",
-        r"$v_\theta^\mathrm{d}$",
-        uids=uids,
-        plot_coords=[1, 3],
-    ),
-    PartQuantity(
-        "PART_VX3",
-        r"$v_\phi^\mathrm{d}$",
-        uids=uids,
-        plot_coords=[2, 3],
-    ),
-    # MapMovie2D("rhovr", r"$\rho v_r$", uids=uids, plot_coords=[3, 3], compute=rhovr),
 ]
 for qty in quantities:
-    qty.uids = "all"
+    if "Dust0" not in qty.key:
+        qty.uids = "all"
 fig1 = Fig(quantities)
 # fig1.axes[0, 0].xmin = 0
 

@@ -1,8 +1,15 @@
 from idefix2python import RunContext, Pipeline, MapMovie2D, Fig
+import numpy as np
 
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind"
 configPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/config.json"
-task = "dw_JL"
+task = "clean_wind_100_b1e4"
+# task = "clean_wind_20_b1e4_axis"
+
+
+def compute_mach_p(data):
+    cs2 = data["PRS"] / data["RHO"]
+    return np.sqrt(data["VX1"] ** 2 + data["VX2"] ** 2) / cs2
 
 
 quantities = [
@@ -29,6 +36,14 @@ quantities = [
         "BX3",
         plot_coords=[3, 1],
         streamlines=["BX1", "BX2"],
+    ),
+    MapMovie2D(
+        "Mach_p",
+        plot_coords=[4, 0],
+        title="Poloidal Mach Number",
+        compute=compute_mach_p,
+        contours=[1],
+        contour_color="green",
     ),
 ]
 fig1 = Fig(quantities)

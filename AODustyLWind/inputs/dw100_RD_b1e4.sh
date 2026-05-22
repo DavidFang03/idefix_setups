@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Slurm job options (job-name, compute nodes, job time)
-#SBATCH --job-name=dw_JL
-#SBATCH --time=15:20:00
+#SBATCH --job-name=dw100_RD_b1e4
+#SBATCH --time=16:00:00
 #SBATCH --partition=gpu
 #SBATCH --qos=standard
 
@@ -26,4 +26,4 @@ export OMP_PLACES=cores
 srun --nodes=1 --ntasks-per-node=1 \
      --hint=nomultithread  --distribution=block:block \
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \
-     /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/idefix -dec 4 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/inputs/dw_JL.ini
+     /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/idefix -dec 1 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/inputs/dw100_RD_b1e4.ini
