@@ -21,11 +21,14 @@ real sizemin;
 real sizemax;
 real thetamin;
 real thetamax;
-real sameradius;
-real sameangle;
+real num_r;
+real num_theta;
+real num_size;
 
 static std::string dat_path;
 static std::string reload_path;
+
+static std::string initialvelocity;
 Analysis *analysis;
 
 KOKKOS_INLINE_FUNCTION real computeDensityFloor(real R, real z, real d_floor_0, real Rin, real c0) {
@@ -249,21 +252,22 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           real R = x1(i) * sin(x2(j));
           real z = x1(i) * cos(x2(j));
 
-          Vc(RHO, k, j, i) = 1.0 / (Rin * sqrt(Rin)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(Rin * Rin + z * z) - 1.0 / Rin));
+          Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
           real densityFloor = computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
           if (Vc(RHO, k, j, i) < densityFloor)
             Vc(RHO, k, j, i) = densityFloor;
+          Vc(PRS, k, j, i) = Vc(PRS, k, j, ighost);
 
-          Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * csdisk * csdisk;
+          // Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * csdisk * csdisk;
 
           if (Vc(VX1, k, j, ighost) >= ZERO_F)
-            Vc(VX1, k, j, i) = -Vc(VX1, k, j, 2 * ighost - i);
+            Vc(VX1, k, j, i) = -Vc(VX1, k, j, 2 * ighost - 1 - i);
           else
             Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
 
           Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
-          Vc(VX3, k, j, i) = Omega * R;
-          Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i);
+          Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
+          Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - 1 - i);
         });
     hydro->boundary->BoundaryForX2s("UserDefX2s", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
   }
@@ -438,8 +442,8 @@ void UserdefBoundaryParticles(DataBlock &data, real t, int dir, BoundarySide sid
   IdefixHostArray1D<int> host_counter = IdefixHostArray1D<int>("counter", 1);
   IdefixArray1D<int> device_counter = IdefixArray1D<int>("counter", 1);
 
-  IdefixHostArray1D<real> host_mass_counter = IdefixHostArray1D<real>("mass_counter", 1);
-  IdefixArray1D<real> device_mass_counter = IdefixArray1D<real>("counter", 1);
+  // IdefixHostArray1D<real> host_mass_counter = IdefixHostArray1D<real>("mass_counter", 1);
+  // IdefixArray1D<real> device_mass_counter = IdefixArray1D<real>("counter", 1);
 
   if ((dir == IDIR) && (side == left)) {
     const real xl = data.mygrid->xbeg[IDIR];
@@ -449,15 +453,15 @@ void UserdefBoundaryParticles(DataBlock &data, real t, int dir, BoundarySide sid
           if (isActive(idx) && x < xl) {
             isActive(idx) = false;
             Kokkos::atomic_add(&device_counter(0), 1);
-            Kokkos::atomic_add(&device_mass_counter(0), states(PMASS, idx));
+            // Kokkos::atomic_add(&device_mass_counter(0), states(PMASS, idx));
           }
         });
     Kokkos::deep_copy(host_counter, device_counter);
 
     data.particles->pack->activeCount -= host_counter(0);
 
-    Kokkos::deep_copy(host_mass_counter, device_mass_counter);
-    data.gravity->centralMass += 4 * M_PI * host_mass_counter(0);
+    // Kokkos::deep_copy(host_mass_counter, device_mass_counter);
+    // data.gravity->centralMass += 4 * M_PI * host_mass_counter(0);
   }
 
   if ((dir == IDIR) && (side == right)) {
@@ -613,9 +617,11 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   etab0 = input.Get<real>("Setup", "etab0", 0);
 
   reload_path = input.Get<std::string>("Setup", "reload_path", 0);
+  initialvelocity = input.Get<std::string>("Particles", "initialvelocity", 0);
 
-  sameradius = input.Get<real>("Particles", "sameradius", 0);
-  sameangle = input.Get<real>("Particles", "sameangle", 0);
+  num_r = input.Get<real>("Particles", "num_r", 0);
+  num_theta = input.Get<real>("Particles", "num_theta", 0);
+  num_size = input.Get<real>("Particles", "num_size", 0);
   rmin = input.Get<real>("Particles", "rmin", 0);
   rmax = input.Get<real>("Particles", "rmax", 0);
   thetamin = input.Get<real>("Particles", "thetamin", 0);
@@ -691,111 +697,85 @@ void Setup::InitFlow(DataBlock &data) {
   real betamin = rhos * sizemin / (rho0 * au);
   real betamax = rhos * sizemax / (rho0 * au);
 
+  real massmin = betamin * (sizemin / au) * (sizemin / au);
+  real massmax = betamax * (sizemax / au) * (sizemax / au);
+
   printf("Number of particles: %.1e\n", ntot);
   printf("dust betas range from: %.1e\n", betamin);
   printf(" to: %.1e\n", betamax);
+  printf("dust masses range from: %.1e\n", massmin);
+  printf(" to: %.1e\n", massmax);
 
-  int npart = 0;
+  // int npart = 0;
   auto x1 = d.x[IDIR];
   auto x2 = d.x[JDIR];
 
-  for (int k = 0; k < d.np_tot[KDIR]; k++) {
-    for (int j = 0; j < d.np_tot[JDIR]; j++) {
-      for (int i = 0; i < d.np_tot[IDIR]; i++) {
-        real r = d.x[IDIR](i);
-        real theta = d.x[JDIR](j);
-        real R = r * sin(theta);
-        real dr = d.dx[IDIR](i);
-        real dtheta = d.dx[JDIR](j);
+  // Many particles
+  // default state
+  for (int n = 0; n < ntot; n++) {
+    d.Ps(PX1, n) = 0.0;
+    d.Ps(PX2, n) = 0.0;
+    d.Ps(PX3, n) = 0;
+    d.Ps(PVX1, n) = 0.0;
+    d.Ps(PVX2, n) = 0.0;
+    d.Ps(PVX3, n) = 0.0;
+    d.Ps(PMASS, n) = 1.0e-3;
+    d.Ps(DRAGCOEFF, n) = 1.0;
+  }
 
-        real x = r * sin(theta);
-        real z = r * cos(theta);
-        real xmin = rmin * sin(thetamin);
-        real zmin = rmin * cos(thetamin);
+  int n = -1;
+  for (int ii = 0; ii < num_r; ii++) {
+    real r0 = rmin + (rmax - rmin) * ii / (num_r - 1);
 
-        // real delta = 10.0 * std::fmax(dr, r * dtheta);
+    for (int jj = 0; jj < num_theta; jj++) {
+      real theta0 = thetamin + (thetamax - thetamin) * jj / (num_theta - 1);
 
-        // setup for gaussian of pressureless fluid
-        // for (int n = 0; n < data.dust.size(); n++) {
-        //   d.dustVc[n](RHO, k, j, i) = 1e-8 + 1e-2 * exp(-0.5 * (x - xmin) * (x - xmin) / (delta * delta)) * exp(-0.5 * (z - zmin) * (z - zmin) / (delta * delta));
-        //   d.dustVc[n](VX1, k, j, i) = d.Vc(VX1, k, j, i);
-        //   d.dustVc[n](VX2, k, j, i) = d.Vc(VX2, k, j, i);
-        //   d.dustVc[n](VX3, k, j, i) = d.Vc(VX3, k, j, i);
-        // }
+      for (int kk = 0; kk < num_size; kk++) {
 
-        // if (npart < d.PactiveCount && fabs(x - xmin) < delta && fabs(z - zmin) < delta) {
+        real beta = betamin + (betamax - betamin) * kk / (num_size - 1);
+        n++;
 
-        //   npart++;
-        // }
+        for (int k = 0; k < d.np_tot[KDIR]; k++) {
+          for (int j = 0; j < d.np_tot[JDIR]; j++) {
+            for (int i = 0; i < d.np_tot[IDIR]; i++) {
+              real r = d.x[IDIR](i);
+              real theta = d.x[JDIR](j);
+              real R = r * sin(theta);
+              real dr = d.dx[IDIR](i);
+              real dtheta = d.dx[JDIR](j);
 
-        // Terminal velocity approximation delta v = grad P/rho t_stop
+              if (abs(r - r0) < dr / 2 && abs(theta - theta0) < dtheta / 2 && n < ntot) {
 
-        // for (int ii = 0; ii < ntot; ii += sameradius) {
-        //   for (int jj = 0; jj < sameradius && (ii + jj) < ntot; jj++) {
-        //     int n = ii + jj;
-        //     real r0 = rmin + (rmax - rmin) * ii / ntot;
-        //     real theta0 = thetamin + (thetamax - thetamin) * jj / sameradius;
+                real OmegaK = pow(R, -1.5);
 
-        //     if (abs(r - r0) < dr && abs(theta - theta0) < dtheta) {
-        //       // for (int n = 0; n < d.PactiveCount; n++) {
-        //       real gradp_r = (d.Vc(PRS, k, j, i + 1) - d.Vc(PRS, k, j, i - 1)) / (x1(i + 1) - x1(i - 1));
-        //       real gradp_theta = (1.0 / r) * (d.Vc(PRS, k, j + 1, i) - d.Vc(PRS, k, j - 1, i)) / (x2(j + 1) - x2(j - 1));
+                real vr;
+                real vtheta;
+                real vphi;
 
-        //       real rhog = d.Vc(RHO, k, j, i);
-        //       real cs = sqrt(d.Vc(PRS, k, j, i) / rhog);
-        //       real beta = betamin + ((betamax - betamin) * n) / d.PactiveCount;
-        //       real tstop = beta / (rhog * cs);
-
-        //       real dv_r = (gradp_r / rhog) * tstop;
-        //       real dv_theta = (gradp_theta) / rhog * tstop;
-
-        //       real OmegaK = pow(r, -1.5);
-
-        //       d.Ps(PX1, n) = r;
-        //       d.Ps(PX2, n) = theta;
-        //       d.Ps(PX3, n) = 0;
-        //       // d.Ps(PVX1, n) = d.Vc(VX1, k, k, i) + dv_r;
-        //       // d.Ps(PVX2, n) = d.Vc(VX2, k, k, i) + dv_theta;
-        //       d.Ps(PVX1, n) = 0.0;
-        //       d.Ps(PVX2, n) = 0.0;
-        //       d.Ps(PVX3, n) = R * OmegaK; // cylindrical radius
-        //       d.Ps(PMASS, n) = 1.0e-3;
-        //       d.Ps(DRAGCOEFF, n) = beta;
-        //       // }
-        //     }
-        //   }
-        // }
-        // Many particles
-        for (int ii = 0; ii < ntot; ii += sameradius) {
-          for (int jj = 0; jj < sameradius && (ii + jj) < ntot; jj += sameangle) {
-            for (int kk = 0; kk < sameangle && (ii + jj + kk) < ntot; kk++) {
-
-              int n = ii + jj + kk;
-              real r0 = rmin + (rmax - rmin) * ii / ntot;
-              real theta0 = thetamin + (thetamax - thetamin) * jj / sameradius;
-              real beta = betamin + ((betamax - betamin) * kk) / sameangle;
-
-              if (abs(r - r0) < dr && abs(theta - theta0) < dtheta) {
-                // for (int n = 0; n < d.PactiveCount; n++) {
-                real gradp_r = (d.Vc(PRS, k, j, i + 1) - d.Vc(PRS, k, j, i - 1)) / (x1(i + 1) - x1(i - 1));
-                real gradp_theta = (1.0 / r) * (d.Vc(PRS, k, j + 1, i) - d.Vc(PRS, k, j - 1, i)) / (x2(j + 1) - x2(j - 1));
-
-                real rhog = d.Vc(RHO, k, j, i);
-                real cs = sqrt(d.Vc(PRS, k, j, i) / rhog);
-                real tstop = beta / (rhog * cs);
-
-                real dv_r = gradp_r / rhog * tstop;
-                real dv_theta = gradp_theta / rhog * tstop;
-
-                real OmegaK = pow(r, -1.5);
+                if (initialvelocity == "tv") {
+                  real cs = sqrt(d.Vc(PRS, k, j, i) / d.Vc(RHO, k, j, i));
+                  real tstop = beta / (d.Vc(RHO, k, j, i) * cs);
+                  real delta = tstop * (d.Vc(VX2, k, j, i) - 1 / r) / r;
+                  vr = d.Vc(VX1, k, j, i) + delta;
+                  vtheta = d.Vc(VX2, k, j, i);
+                  vphi = d.Vc(VX3, k, j, i);
+                } else if (initialvelocity == "zero") {
+                  vr = 0.0;
+                  vtheta = 0.0;
+                  vphi = R * OmegaK;
+                } else {
+                  vr = d.Vc(VX1, k, j, i);
+                  vtheta = d.Vc(VX2, k, j, i);
+                  vphi = R * OmegaK;
+                }
 
                 d.Ps(PX1, n) = r;
                 d.Ps(PX2, n) = theta;
                 d.Ps(PX3, n) = 0;
-                d.Ps(PVX1, n) = 0.0;
-                d.Ps(PVX2, n) = 0.0;
-                d.Ps(PVX3, n) = R * OmegaK; // cylindrical radius
-                d.Ps(PMASS, n) = 1.0e-3;
+                d.Ps(PVX1, n) = vr;
+                d.Ps(PVX2, n) = vtheta;
+                d.Ps(PVX3, n) = vphi; // cylindrical radius
+                d.Ps(PMASS, n) = 1e-10;
                 d.Ps(DRAGCOEFF, n) = beta;
                 // }
               }
@@ -805,19 +785,6 @@ void Setup::InitFlow(DataBlock &data) {
       }
     }
   }
-
-  // // kill the leftofters
-  // for (int n = npart; n < d.PactiveCount; n++) {
-  //   d.Ps(PX1, npart) = 0.0;
-  //   d.Ps(PX2, npart) = 0.0;
-  //   d.Ps(PX3, npart) = 0;
-  //   d.Ps(PVX1, npart) = 0.0;
-  //   d.Ps(PVX2, npart) = 0.0;
-  //   d.Ps(PVX3, npart) = 0.0;
-  //   d.Ps(PMASS, npart) = 1.0e-3;
-  //   d.Ps(DRAGCOEFF, npart) = betamin + ((betamax - betamin) * npart) / d.PactiveCount;
-  //   npart++;
-  // }
 
   // delete image;
 

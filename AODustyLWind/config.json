@@ -87,9 +87,6 @@
         }
     },
     "InvDt": {
-        "style_kwargs": {
-            "cmap": "inferno"
-        },
         "symbol": "$\\mathrm{d}t^{-1}$"
     },
     "eta": {

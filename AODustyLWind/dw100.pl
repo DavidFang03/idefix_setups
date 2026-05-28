@@ -35,15 +35,14 @@ my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup_cleanwind";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
-my $name            = "clean_wind";
+my $name            = "clean_wind_100";
 
-# my @sizes = ("1e-5");
-my @tasks = ("100_b1e4");
-my @indexes = (0);
+my @betas = ("2e4","4e4","6e4","8e4", "1e5");
+my @indexes = (0,1,2,3,4);
 
 for my $index (@indexes) {
 print $index."\n";
-my $stringdx_1 = $name."_".$tasks[$index]; #OW_test
+my $stringdx_1 = $name."_b".$betas[$index]; #OW_test
 my $outputs_path_1 = $folder_path."outputs/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
 my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
 `mkdir -p $vtksdir1`;
@@ -53,6 +52,7 @@ my $idefix_limit = $time_results{idefix} * 0.99;
 print $indir."\n";
 `mkdir -p $indir`;
 my $inifile = $indir.$stringdx_1.".ini";
+my $beta = $betas[$index];
 open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
@@ -75,17 +75,6 @@ resistivity  explicit  userdef
 gamma        1.0001
 
 
-# [Dust]
-# nSpecies         0
-# drag             userdef
-# drag_feedback    no
-
-# [Particles]
-# count            per_proc  10
-# stopping_time    size
-# ParticleMass     3e-3
-# DustToGas        3e-3
-
 
 [Gravity]
 potential    central
@@ -101,8 +90,7 @@ X2-end    userdef
 Rm0                    10.0
 etab0                  1.0
 epsilon                0.05
-beta                   1e4
-# beta->10000?
+beta                   $beta
 epsilonTop             0.3
 Hideal                 5.0
 Am                     1.0

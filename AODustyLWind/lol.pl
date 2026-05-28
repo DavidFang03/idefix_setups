@@ -38,12 +38,14 @@ my $options         = "-dec $gpus 1";
 my $name            = "dw100";
 
 # my @sizes = ("1e-5");
-my @tasks = ("b1e4_1000p_zero");
-my @indexes = (0);
+my @betas = ("1e4", "1e3");
+my @indexes = (0,1);
 
 for my $index (@indexes) {
 print $index."\n";
-my $stringdx_1 = $name."_".$tasks[$index]; #OW_test
+my $beta = $betas[$index];
+my $reload_path = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind_100_b".$beta."_t3000.dmp";
+my $stringdx_1 = $name."_b".$beta."_2000p_tv"; #OW_test
 my $outputs_path_1 = $folder_path."outputs/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
 my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
 `mkdir -p $vtksdir1`;
@@ -63,7 +65,7 @@ X2-grid    3  0.0  256   u  1.28   96  u  1.861592653589  256  u  3.141592653589
 
 [TimeIntegrator]
 CFL            0.9
-tstop          2000.0
+tstop          600.0
 first_dt       1.e-6
 nstages        2
 max_runtime    $idefix_limit
@@ -81,16 +83,19 @@ gamma        1.0001
 # drag_feedback    no
 
 [Particles]
-count            per_proc  1000
+count            per_proc  2000 // = num_r * num_theta * num_size
 stopping_time    size
-sameradius          10
-sameangle           10
+num_r              10           // Number of radius steps
+num_theta          10           // Number of angle steps
+num_size           20           // Number of size steps
 thetamin           1.1479424006619559 # 9h
 thetamax           1.3734007669450157 # 4h for h = 0.05, 4h is at theta=pi/2-pi/16 = 1.37
 rmin               2.0
 rmax               9.0
 sizemin            0.1e-6 # in m
-sizemax            10.0e-6 # in m
+sizemax            5.0e-6 # in m
+sort               false
+initialvelocity    tv
 
 [Gravity]
 potential    central
@@ -106,19 +111,18 @@ X2-end    userdef
 Rm0                    10.0
 etab0                  1.0
 epsilon                0.05
-beta                   1e4
-# beta->10000?
+beta                   $beta
 epsilonTop             0.3
 Hideal                 5.0
 Am                     1.0
 densityFloor           1.0e-7
 transitionSmoothing    0.5
 # fromDump               true
-reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind_100_b1e4_t3000.dmp
+reload_path             $reload_path
 
 [Output]
 uservar    eta    Am    InvDt
-vtk        5.0
+vtk        2.0
 dmp_dir    $outputs_path_1
 dmp        50
 log        1000

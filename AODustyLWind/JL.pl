@@ -38,7 +38,7 @@ my $options         = "-dec $gpus 1";
 my $name            = "dw";
 
 # my @sizes = ("1e-5");
-my @tasks = ("JL_b1e3_s1e-4_zero");
+my @tasks = ("JL_b1e3_s1e-4_s1e-6");
 my @indexes = (0);
 
 for my $index (@indexes) {
@@ -84,6 +84,7 @@ gamma        1.0001
 count            per_proc  20
 stopping_time    size
 sameradius              5
+sameangle              1
 thetamin           1.04
 thetamax           1.5 # for h = 0.05, 4h is at theta=pi/2-pi/16 = 1.37
 rmin               2.0

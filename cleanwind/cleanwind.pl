@@ -24,7 +24,7 @@ my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
 my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/Lidefix";                            # The directory where calculations are run
-my $folder_name     = "AODustyLWind";
+my $folder_name     = "cleanwind";
 my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
@@ -32,14 +32,13 @@ my $qos             = "dev";
 my $nodes           = "1";
 my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
-my $setup_dir      = $folder_path."reload_l";
+my $setup_dir      = $folder_path."setup";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
-my $name            = "dw100";
+my $name            = "cw";
 
 # my @sizes = ("1e-5");
-my @tasks = ("RD_b1e4_zero");
-my @betas = ("1e4");
+my @tasks = ("20_b1e4");
 my @indexes = (0);
 
 for my $index (@indexes) {
@@ -58,14 +57,13 @@ open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
-X1-grid    1  1.0  768  l   100.0
+X1-grid    1  1.0  512  l   20.0
 X2-grid    3  0.0  256   u  1.28   96  u  1.861592653589  256  u  3.141592653589793
 # X2-grid    1  0.0  1024  u  3.141592653589793
 
 [TimeIntegrator]
 CFL            0.9
-tstop          3000.0
-# tstop            1000.0
+tstop          10000.0
 first_dt       1.e-6
 nstages        2
 max_runtime    $idefix_limit
@@ -76,24 +74,6 @@ ambipolar    explicit  userdef
 resistivity  explicit  userdef
 gamma        1.0001
 
-
-# [Dust]
-# nSpecies         0
-# drag             userdef
-# drag_feedback    no
-
-[Particles]
-count            per_proc  10
-stopping_time    size
-sameradius            1
-sameangle            1
-thetamin           1.37 # for h = 0.05, 4h is at theta=pi/2-pi/16 = 1.37
-thetamax           1.37
-rmin               9.0
-rmax               9.0
-sizemin            0.1e-6 # in m
-sizemax            10.0e-6 # in m
-
 [Gravity]
 potential    central
 Mcentral     1.0
@@ -101,26 +81,23 @@ Mcentral     1.0
 [Boundary]
 X1-beg    userdef
 X1-end    userdef
-X2-beg    userdef
-X2-end    userdef
+X2-beg    axis # test userdef later
+X2-end    axis # test userdef later
 
 [Setup]
 Rm0                    10.0
 etab0                  1.0
 epsilon                0.05
-beta                   $betas[$index]
-# beta->10000?
-epsilonTop             0.3
-Hideal                 5.0
+beta                   1.0e4
+epsilonTop             0.3 # hmmm
+# Hideal                 5.0 # hmmm
 Am                     1.0
 densityFloor           1.0e-7
-transitionSmoothing    0.5
-# fromDump               true
-reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind_100_b$betas[$index]_t3000.dmp
+transitionSmoothing    0.1
 
 [Output]
 uservar    eta    Am    InvDt
-vtk        2.0
+vtk        20.0
 dmp_dir    $outputs_path_1
 dmp        200
 log        1000

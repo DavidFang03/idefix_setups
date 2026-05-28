@@ -1,7 +1,5 @@
-#include "setup.hpp"
-#include "analysis.hpp"
-#include "dumpImage.hpp"
 #include "idefix.hpp"
+#include "setup.hpp"
 
 real epsilonGlob;
 real epsilonTopGlob;
@@ -11,11 +9,6 @@ real AmMidGlob;
 real gammaGlob;
 real densityFloorGlob;
 real trSmoothingGlob;
-real Rm0;
-real etab0;
-
-static std::string dat_path;
-Analysis *analysis;
 
 KOKKOS_INLINE_FUNCTION real computeDensityFloor(real R, real z, real d_floor_0, real Rin, real c0) {
 
@@ -71,9 +64,9 @@ void Ambipolar(DataBlock &data, real t, IdefixArray3D<real> &xAin) {
         real B2 = Vc(BX1, k, j, i) * Vc(BX1, k, j, i) + Vc(BX2, k, j, i) * Vc(BX2, k, j, i) + Vc(BX3, k, j, i) * Vc(BX3, k, j, i);
         real eta = B2 / (Omega * Am * Vc(RHO, k, j, i));
         if (eta > etamax)
-          xA(k, j, i) = etamax / B2; //! SAME THING????
+          xA(k, j, i) = etamax / B2;
         else
-          xA(k, j, i) = 1.0 / (Omega * Am * Vc(RHO, k, j, i)); //! SAME THING????
+          xA(k, j, i) = 1.0 / (Omega * Am * Vc(RHO, k, j, i));
 
         // Kill it at the radial boundaryloop
         if (x1(i) / Rin < Rin * (1 + waveKillWidth)) {
@@ -90,58 +83,11 @@ void Resistivity(DataBlock &data, real t, IdefixArray3D<real> &etain) {
   IdefixArray1D<real> x2 = data.x[JDIR];
   IdefixArray4D<real> Vc = data.hydro->Vc;
 
-  real trSmoothing = trSmoothingGlob;
-  real Hideal = HidealGlob;
   real epsilon = epsilonGlob;
 
-  real R0 = data.mygrid->xbeg[IDIR]; // =1
-  // The constant pre factor for R_m in the dead zone
-  real Rm0copy = Rm0;
-  real etaBuffer0 = etab0;
-
   idefix_for(
-      "Resistivity", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-        real z = x1(i) * cos(x2(j));
-        real R = x1(i) * sin(x2(j)); // cylindric R
-        real Ri = FMAX(R0, R);
-        real r = x1(i);
-        real zh = z / (R * epsilon); //=1 ??? =z/H
-        real Omega = pow(R, -1.5);
-        // Inner region damping. Buffer region
-        real EtaBuffer = etaBuffer0 * epsilon * epsilon * 0.05 * FMAX((1.25 * R0 - r), 0.0); // # [R0, R0+0.25R0]
-
-        // Transition across disk and corona (want eta to be zero outside the
-        // disk dead zone)
-        real TransDC = 0.5 * (1 - tanh((fabs(zh) - Hideal) / (0.2 * trSmoothing)));
-        // Transition across the DZI (want eta to be zero outside the disk dead
-        // zone)
-        // real TransDZI = 0.5 * (1 + tanh((R - 10.0) / (0.1 * trSmoothing)));
-        // //! cause eta to diverge->crash
-        // // The expression for the magnetic Reynolds number (R_m) in the dead
-        // // zone of the disk
-        // real RmDZ = RmDZ0 * 1 / (Vc(RHO, k, j, i) * Ri);
-        // // The expression for the Ohmic resistivity in the dead zone of the
-        // disk real etaDZ = pow(epsilon * Ri, 2) * Omega /
-        //              RmDZ; // exact expresion to get eta from Rm.
-        // The final expression for the Ohmic resistivity (includes the buffer
-        // zone contribution). Makes R_M = 50 at the inner edge of the DZI
-        // (feels appropriate - maybe disk slightly heavy? - discuss) eta(k,j,i)
-        // = (pow(Ri,1.5))*Vc(RHO,k,j,i)/(10.0*10.0*pow(10,0.5))*TransDC +
-        // EtaBuffer;
-        // eta(k,j,i) = EtaBuffer +
-        // (pow(Ri,1.5))*Vc(RHO,k,j,i)/2500*TransDZI*TransDC; eta(k,j,i) =
-        // EtaBuffer
-        // + etaDZ;
-        // eta(k, j, i) = etaDZ * TransDC * TransDZI + EtaBuffer;
-        // eta(k, j, i) = EtaBuffer;
-        // real eta0 = pow(epsilon * Ri, 2) * Omega / Rm0copy;
-        // eta0 = 0;
-        // Precription of Roberts,Latter,Lesur (2026): Rm propto 1/(rho R)
-        eta(k, j, i) = epsilon * epsilon * pow(Ri, 1.5) * Vc(RHO, k, j, i) / Rm0copy * TransDC + EtaBuffer;
-        // eta(k, j, i) = eta0 * (pow(Ri, 1.5)) * Vc(RHO, k, j, i) /
-        //                    (10.0 * 10.0 * pow(10, 0.5)) * TransDC +
-        //                EtaBuffer;
-      });
+      "Resistivity", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR],
+      KOKKOS_LAMBDA(int k, int j, int i) { eta(k, j, i) = x1(i) < 1.2 ? (1.2 - x1(i)) / 0.2 * epsilon * epsilon : ZERO_F; });
 }
 
 void MySourceTerm(Hydro *hydro, const real t, const real dtin) {
@@ -203,7 +149,6 @@ void InternalBoundary(Hydro *hydro, const real t) {
         real b2 = EXPAND(Vc(BX1, k, j, i) * Vc(BX1, k, j, i), +Vc(BX2, k, j, i) * Vc(BX2, k, j, i), +Vc(BX3, k, j, i) * Vc(BX3, k, j, i));
         real va2 = b2 / Vc(RHO, k, j, i);
         real myMax = vAmax;
-        // if(x1(i)<1.1) myMax=myMax/50.0;
         if (va2 > myMax * myMax) {
           real T = Vc(PRS, k, j, i) / Vc(RHO, k, j, i);
           Vc(RHO, k, j, i) = b2 / (myMax * myMax);
@@ -211,7 +156,6 @@ void InternalBoundary(Hydro *hydro, const real t) {
         }
         real densityFloor = computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
         if (Vc(RHO, k, j, i) < densityFloor) {
-          real T = Vc(PRS, k, j, i) / Vc(RHO, k, j, i);
           Vc(RHO, k, j, i) = densityFloor;
         }
       });
@@ -226,7 +170,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
     IdefixArray1D<real> x2 = data->x[JDIR];
 
     int ighost = data->nghost[IDIR];
-    real Omega = 1.0; // assuming Rin = 1.0
+    real Omega = 1.0;
     real Rin = 1.0;
     real csdisk = epsilonGlob / sqrt(Rin);
     real cscorona = epsilonTopGlob / sqrt(Rin);
@@ -238,25 +182,23 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           real R = x1(i) * sin(x2(j));
           real z = x1(i) * cos(x2(j));
 
-          // Vc(RHO, k, j, i) = 1.0 / (Rin * sqrt(Rin)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(Rin * Rin + z * z) - 1.0 / Rin));
-          Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
+          Vc(RHO, k, j, i) = 1.0 / (Rin * sqrt(Rin)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(Rin * Rin + z * z) - 1.0 / Rin));
           real densityFloor = computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
           if (Vc(RHO, k, j, i) < densityFloor)
             Vc(RHO, k, j, i) = densityFloor;
-          Vc(PRS, k, j, i) = Vc(PRS, k, j, ighost);
 
-          // Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * csdisk * csdisk;
+          Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * csdisk * csdisk;
 
           if (Vc(VX1, k, j, ighost) >= ZERO_F)
-            Vc(VX1, k, j, i) = -Vc(VX1, k, j, 2 * ighost - 1 - i);
+            Vc(VX1, k, j, i) = -Vc(VX1, k, j, 2 * ighost - i);
           else
             Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
-
           Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
-          Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
-          Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - 1 - i);
+
+          Vc(VX3, k, j, i) = Omega * R;
+          Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i);
         });
-    hydro->boundary->BoundaryForX2s("UserDefX2s", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
+    hydro->boundary->BoundaryForX2s("UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
   }
 
   if ((dir == IDIR) && (side == right)) {
@@ -283,57 +225,11 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           else
             Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
           Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
-          // real Rmin = FMAX(0.3,R);
 
-          // Vc(VX3,k,j,i) = 1.0/sqrt(Rmin) * sqrt( Rmin / sqrt(Rmin*Rmin +
-          // z*z));
           Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
           Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i);
         });
-    hydro->boundary->BoundaryForX2s("UserDefX2s", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
-  }
-  if (dir == JDIR) {
-    IdefixArray4D<real> Vc = hydro->Vc;
-    IdefixArray4D<real> Vs = hydro->Vs;
-
-    const int j_beg = data->beg[JDIR];
-    const int j_end = data->end[JDIR];
-
-    if (side == left) {
-      // Cell-centered Loop
-      idefix_for(
-          "UserDefX2_Left_Vc", 0, data->np_tot[KDIR], 0, j_beg, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-            // Reflection across the interface j_beg - 0.5
-            const int jrefl = 2 * j_beg - 1 - j;
-            Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
-            Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
-            Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
-            Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
-            Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i); // https://github.com/idefix-code/idefix/issues/203
-          });
-
-      hydro->boundary->BoundaryForX1s(
-          "UserDefX1_Left_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-            const int jrefl = 2 * j_beg - 1 - j;
-            Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
-          });
-    } else if (side == right) {
-      idefix_for(
-          "UserDefX2_Right_Vc", 0, data->np_tot[KDIR], j_end, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-            const int jrefl = 2 * j_end - 1 - j;
-            Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
-            Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
-            Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
-            Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
-            Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i);
-          });
-
-      hydro->boundary->BoundaryForX1s(
-          "UserDefX1_Right_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-            const int jrefl = 2 * j_end - 1 - j;
-            Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
-          });
-    }
+    hydro->boundary->BoundaryForX2s("UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
   }
 }
 
@@ -348,13 +244,13 @@ void EmfBoundary(DataBlock &data, const real t) {
     idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], KOKKOS_LAMBDA(int k, int j) { Ex3(k, j, ighost) = ZERO_F; });
   }
   // additional zero EMF on the boundary
-  if (data.lbound[JDIR] == axis || data.lbound[JDIR] == userdef) {
-    int jref = data.beg[JDIR];
-    idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int i) { Ex3(k, jref, i) = ZERO_F; });
+  if (data.lbound[JDIR] == axis) {
+    int jghost = data.beg[JDIR];
+    idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int i) { Ex3(k, jghost, i) = ZERO_F; });
   }
-  if (data.rbound[JDIR] == axis || data.rbound[JDIR] == userdef) {
-    int jref = data.end[JDIR];
-    idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int i) { Ex3(k, jref, i) = ZERO_F; });
+  if (data.rbound[JDIR] == axis) {
+    int jghost = data.end[JDIR];
+    idefix_for("EMFBoundary", 0, data.np_tot[KDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int i) { Ex3(k, jghost, i) = ZERO_F; });
   }
 }
 
@@ -362,10 +258,8 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
 
   // Use Invdt as scratch array
   IdefixArray3D<real> scrh("Scratch", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
-  IdefixArray3D<real> scrh_eta("Scratch_eta", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
 
   // Ask for a computation of xA ambipolar in this scratch array
-  Resistivity(data, data.t, scrh_eta);
   Ambipolar(data, data.t, scrh);
 
   // Mirror data on Host
@@ -374,10 +268,8 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   // Sync it
   d.SyncFromDevice();
 
-  // Make references to the user-defined arrays (variables is a container of
-  // IdefixHostArray3D) Note that the labels should match the variable names in
-  // the input file
-  IdefixHostArray3D<real> eta = variables["eta"];
+  // Make references to the user-defined arrays (variables is a container of IdefixHostArray3D)
+  // Note that the labels should match the variable names in the input file
   IdefixHostArray3D<real> Am = variables["Am"];
   IdefixHostArray3D<real> InvDt = variables["InvDt"];
 
@@ -386,8 +278,6 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   IdefixHostArray4D<real> Vc = d.Vc;
   IdefixArray3D<real>::HostMirror scrhHost = Kokkos::create_mirror_view(scrh);
   Kokkos::deep_copy(scrhHost, scrh);
-  IdefixArray3D<real>::HostMirror scrhHost_eta = Kokkos::create_mirror_view(scrh_eta);
-  Kokkos::deep_copy(scrhHost_eta, scrh_eta);
 
   for (int k = d.beg[KDIR]; k < d.end[KDIR]; k++) {
     for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
@@ -395,15 +285,12 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
         real z = x1(i) * cos(x2(j));
         real R = FMAX(FABS(x1(i) * sin(x2(j))), ONE_F);
         real Omega = pow(R, -1.5);
-        eta(k, j, i) = scrhHost_eta(k, j, i);
         Am(k, j, i) = 1.0 / (Omega * scrhHost(k, j, i) * Vc(RHO, k, j, i));
         InvDt(k, j, i) = d.InvDt(k, j, i);
       }
     }
   }
 }
-
-void AnalysisFunction(DataBlock &data) { analysis->PerformAnalysis(data); }
 
 // Default constructor
 
@@ -413,11 +300,10 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   // Set the function for userdefboundary
   data.hydro->EnrollUserDefBoundary(&UserdefBoundary);
   data.hydro->EnrollAmbipolarDiffusivity(&Ambipolar);
-  data.hydro->EnrollOhmicDiffusivity(&Resistivity);
+  // data.hydro->EnrollOhmicDiffusivity(&Resistivity);
   data.hydro->EnrollUserSourceTerm(&MySourceTerm);
   data.hydro->EnrollInternalBoundary(&InternalBoundary);
   data.hydro->EnrollEmfBoundary(&EmfBoundary);
-
   output.EnrollUserDefVariables(&ComputeUserVars);
   gammaGlob = data.hydro->eos->GetGamma();
   epsilonGlob = input.Get<real>("Setup", "epsilon", 0);
@@ -427,16 +313,6 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   AmMidGlob = input.Get<real>("Setup", "Am", 0);
   densityFloorGlob = input.Get<real>("Setup", "densityFloor", 0);
   trSmoothingGlob = input.Get<real>("Setup", "transitionSmoothing", 0);
-  Rm0 = input.Get<real>("Setup", "Rm0", 0);
-  etab0 = input.Get<real>("Setup", "etab0", 0);
-
-  dat_path = input.Get<std::string>("Output", "dat_path", 0);
-  analysis = new Analysis(input, grid, data, output, dat_path);
-  output.EnrollAnalysis(&AnalysisFunction);
-  // Reset analysis if required
-  if (!input.restartRequested) {
-    analysis->ResetAnalysis();
-  }
 }
 
 // This routine initialize the flow
@@ -491,7 +367,6 @@ void Setup::InitFlow(DataBlock &data) {
         real densityFloor = computeDensityFloor(R, z, densityFloorGlob, Rin, epsilonGlob);
         if (d.Vc(RHO, k, j, i) < densityFloor) {
           d.Vc(RHO, k, j, i) = densityFloor;
-          // d.Vc(PRS,k,j,i) = T2*d.Vc(RHO,k,j,i);
         }
 
         // Vector potential on the corner
@@ -501,20 +376,12 @@ void Setup::InitFlow(DataBlock &data) {
         A(IDIR, k, j, i) = ZERO_F;
         A(JDIR, k, j, i) = ZERO_F;
 
-#ifdef EVOLVE_VECTOR_POTENTIAL
-        if (R > Rin) {
-          d.Ve(AX3e, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0) + Rin * Rin / (2.0 * R));
-        } else {
-          d.Ve(AX3e, k, j, i) = B0 * R / 2.0;
-        }
-#else
         if (R > Rin) {
           A(KDIR, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0));
           A(KDIR, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0) + Rin * Rin / (2.0 * R));
         } else {
           A(KDIR, k, j, i) = B0 * R / 2.0;
         }
-#endif
       }
     }
   }
