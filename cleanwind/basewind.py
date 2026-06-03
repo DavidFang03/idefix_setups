@@ -1,15 +1,14 @@
-from idefix2python import RunContext, Pipeline, MapMovie2D, OneComponentOneVariable, Fig
+from idefix2python import RunContext, Pipeline, MapMovie2D, PartQuantity, Fig
 import numpy as np
 
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind"
 configPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/config.json"
-task = "clean_wind_100_b1e4"
+task = "clean_wind_100_b3e3"
 
-runContext = RunContext(task, projectPath, configPath=configPath)
 
-RLine = runContext.gridInfo.X1Line
-ThetaLine = runContext.gridInfo.X2Line
-Rgrid, Thetagrid = np.meshgrid(RLine, ThetaLine)
+def zoom(x1, x2):
+    return x1 < 5, np.ones_like(x2, dtype=bool)
+    return x1 < 10, x2 <= np.pi / 2
 
 
 def rhovr(v):
@@ -20,30 +19,6 @@ def plasmabeta(v):
     P = v.data["PRS"]
     B2 = v.data["BX1"] ** 2 + v.data["BX2"] ** 2 + v.data["BX3"] ** 2
     return 8 * np.pi * P / B2
-
-
-def massloss(v):
-    dR = np.diff(v.rl)
-    rho, vr, prs = v.data["RHO"], v.data["VX1"], v.data["PRS"]
-    thetam4h = np.pi / 2 - np.atan(4 * 0.05)
-    thetap4h = np.pi / 2 + np.atan(4 * 0.05)
-    jm4h = np.searchsorted(ThetaLine, thetam4h)
-    jp4h = np.searchsorted(ThetaLine, thetap4h)
-    jmid = np.searchsorted(ThetaLine, np.pi / 2)
-
-    xiup = np.sum(rho[jp4h, :] * vr[jp4h, :] * dR)
-    xidown = np.sum(rho[jm4h, :] * vr[jm4h, :] * dR)
-    norm = 2 * np.sum(rho[jmid, :] * np.sqrt(prs[jmid, :] / rho[jmid, :]) * dR)
-
-    # print("rho", v.data["PRS"])
-    # print(rho[jp4h, :])
-    # print(vr[jp4h, :])
-    # print(xiup, xidown, norm)
-
-    xi = (xiup - xidown) / norm
-    # print(xi)
-
-    return xi
 
 
 quantities = [
@@ -79,21 +54,19 @@ quantities = [
         compute=plasmabeta,
         bounds=[None, 2.1e4],
     ),
-    OneComponentOneVariable(
-        "xi",
-        r"$\xi$",
-        plot_coords=[1, 2],
-        compute=massloss,
-        bounds=[None, None],
-    ),
     # MapMovie2D("rhovr", r"$\rho v_r$",, plot_coords=[3, 3], compute=rhovr),
 ]
 
 fig1 = Fig(quantities)
 
 # Initialize context
+runContext = RunContext(task, projectPath, configPath=configPath)
 
 # Inject ONLY the 2D fields into the pipeline
-pipeline = Pipeline(runContext, [fig1])
+pipeline = Pipeline(
+    runContext,
+    [fig1],
+    zoom=zoom,
+)
 
 pipeline.run()

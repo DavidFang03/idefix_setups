@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Slurm job options (job-name, compute nodes, job time)
-#SBATCH --job-name=cw_20_b1e4
-#SBATCH --time=04:00:00
+#SBATCH --job-name=clean_wind_100_b3e3
+#SBATCH --time=16:00:00
 #SBATCH --partition=gpu
-#SBATCH --qos=dev
+#SBATCH --qos=standard
 
 # Request right number of full nodes (48 cores by node for A100-80 GPU nodes))
 #SBATCH --nodes=1
@@ -26,4 +26,4 @@ export OMP_PLACES=cores
 srun --nodes=1 --ntasks-per-node=1 \
      --hint=nomultithread  --distribution=block:block \
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \
-     /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/setup/idefix -dec 1 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/inputs/cw_20_b1e4.ini
+     /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/setup/idefix -dec 1 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/inputs/clean_wind_100_b3e3.ini

@@ -26,7 +26,7 @@ my %time_results    = format_time($minutes);
 my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/Lidefix";                            # The directory where calculations are run
 my $folder_name     = "AODustyLWind";
 my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
-my $indir           = $folder_path."inputs/";
+my $indir           = $folder_path."inputs_v2/";
 my $time            = $time_results{slurm};
 my $qos             = "standard";
 my $nodes           = "1";
@@ -35,18 +35,19 @@ my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."reload_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
-my $name            = "dw100";
+my $name            = "dw100_v2";
 
 # my @sizes = ("1e-5");
-my @betas = ("1e4", "1e3");
-my @indexes = (0,1);
+my @betas = ("1e3", "3e3", "5e3", "7e3", "1e4", "2e4", "4e4", "6e4");
+my @indexes = (4);
+# my @indexes = (0, 1, 2, 3, 4, 5, 6, 7);
 
 for my $index (@indexes) {
 print $index."\n";
 my $beta = $betas[$index];
-my $reload_path = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind_100_b".$beta."_t3000.dmp";
-my $stringdx_1 = $name."_b".$beta."_2000p_tv"; #OW_test
-my $outputs_path_1 = $folder_path."outputs/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
+my $reload_path = "/home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/outputs/clean_wind_100_b".$beta."/dump.0020.dmp";
+my $stringdx_1 = $name."_b".$beta."_2000p"; #OW_test
+my $outputs_path_1 = $folder_path."outputs_v2/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
 my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
 `mkdir -p $vtksdir1`;
 
@@ -65,7 +66,7 @@ X2-grid    3  0.0  256   u  1.28   96  u  1.861592653589  256  u  3.141592653589
 
 [TimeIntegrator]
 CFL            0.9
-tstop          600.0
+tstop          2000.0
 first_dt       1.e-6
 nstages        2
 max_runtime    $idefix_limit
@@ -92,10 +93,10 @@ thetamin           1.1479424006619559 # 9h
 thetamax           1.3734007669450157 # 4h for h = 0.05, 4h is at theta=pi/2-pi/16 = 1.37
 rmin               2.0
 rmax               9.0
-sizemin            0.1e-6 # in m
-sizemax            5.0e-6 # in m
+sizemin            1.0e-9 # in m
+sizemax            1.0e-6 # in m
 sort               false
-initialvelocity    tv
+initialvelocity    same
 
 [Gravity]
 potential    central

@@ -240,10 +240,12 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 
           // Vc(RHO, k, j, i) = 1.0 / (Rin * sqrt(Rin)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(Rin * Rin + z * z) - 1.0 / Rin));
           Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
+          real cs2 = Vc(PRS, k, j, ighost) / Vc(RHO, k, j, ighost);
           real densityFloor = computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
-          if (Vc(RHO, k, j, i) < densityFloor)
+          if (Vc(RHO, k, j, i) < densityFloor) {
             Vc(RHO, k, j, i) = densityFloor;
-          Vc(PRS, k, j, i) = Vc(PRS, k, j, ighost);
+          }
+          Vc(PRS, k, j, i) = cs2 * Vc(RHO, k, j, i);
 
           // Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * csdisk * csdisk;
 

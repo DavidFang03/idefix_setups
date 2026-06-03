@@ -1,30 +1,26 @@
 {
     "BX1": {
-        "bounds": [
-            -1e-4,
-            1e-4
-        ],
-        "symbol": "$B_r$"
+        "symbol": "$B_r$",
+        "style_kwargs": {
+            "cmap": "plasma"
+        }
     },
     "BX2": {
-        "bounds": [
-            -1e-4,
-            1e-4
-        ],
-        "symbol": "$B_\\theta$"
+        "symbol": "$B_\\theta$",
+        "style_kwargs": {
+            "cmap": "plasma"
+        }
     },
     "BX3": {
-        "bounds": [
-            -1e-3,
-            1e-3
-        ],
-        "symbol": "$B_\\phi$"
+        "symbol": "$B_\\phi$",
+        "style_kwargs": {
+            "cmap": "plasma"
+        }
     },
     "VX1": {
         "norm": "TwoSlopeNorm",
         "style_kwargs": {
-            "cmap": "RdBu_r",
-            "alpha": 0.2
+            "cmap": "RdBu_r"
         },
         "symbol": "$v_r$",
         "bounds": [
@@ -118,6 +114,11 @@
         ],
         "style_kwargs": {
             "cmap": "inferno"
+        }
+    },
+    "beta": {
+        "style_kwargs": {
+            "cmap": "plasma"
         }
     }
 }

@@ -19,8 +19,8 @@ sub format_time
     return %time;
 }
 
-my $minutes         = 920;
-my $gpus            = 1;
+my $minutes         = 960;
+my $gpus            = 4;
 
 my %time_results    = format_time($minutes);
 my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/Lidefix";                            # The directory where calculations are run
@@ -34,11 +34,11 @@ my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup_cleanwind";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
-my $options         = "-dec $gpus 1";
-my $name            = "clean_wind_100";
+my $options         = "-dec 4 1";
+my $name            = "clean_wind_100_hr";
 
-my @betas = ("2e4","4e4","6e4","8e4", "1e5");
-my @indexes = (0,1,2,3,4);
+my @betas = ("1e4");
+my @indexes = (0);
 
 for my $index (@indexes) {
 print $index."\n";
@@ -57,8 +57,8 @@ open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
-X1-grid    1  1.0  768  l   100.0
-X2-grid    3  0.0  256   u  1.28   96  u  1.861592653589  256  u  3.141592653589793
+X1-grid    1  1.0  2048  l   100.0
+X2-grid    3  0.0  512   u  1.28   256  u  1.861592653589  512  u  3.141592653589793
 # X2-grid    1  0.0  1024  u  3.141592653589793
 
 [TimeIntegrator]
