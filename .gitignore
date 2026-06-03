@@ -15,6 +15,7 @@
 **/*.mp4
 **/*.png
 .vscode
+*.dat
 *.vtk
 Idefix2Python/
 *.npy
