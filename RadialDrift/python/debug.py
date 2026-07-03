@@ -12,10 +12,10 @@ import utilities
 from pathlib import Path
 import numpy as np
 
-projectPath = "/home/dfang/Code/idefix_setups/RadialDrift"
-task = "Drift_Tau"
-# uids = None
-uids = "all"
+projectPath = "/home/dfang/Code/idefix_setups/VerticalSettling"
+task = "Settling_Size_clean"
+uids = None
+# uids = "all"
 # By default the vtks are expected to be in {projetPath}/{task}/outputs/vtks/
 # In this example, the vtks/ folder contains both part*.vtk and data*.vtk
 
@@ -49,23 +49,6 @@ class analytical_trajectory:
 RLine = runContext.gridInfo.X1Line
 
 
-def get_part_index(v):
-    rpart = v.data["PART_X1"]
-    i = np.array([np.argmin(np.abs(rpart - r)) for r in RLine])
-
-    return i
-
-
-def rholocal(v):
-    i = get_part_index(v)
-    return v.data["RHO"][i]
-
-
-def dvr(v):
-    i = get_part_index(v)
-    return v.data["PART_X1"] - v.data["VX1"][i]
-
-
 def drag_force(v):
     return -(v.data["PART_VX1"] - v.data["vr_local"]) / v.data["TSTOP"]
 
@@ -82,16 +65,6 @@ def total_force(v):
     return drag_force(v) + grav_force(v) + centrifugal_force(v)
 
 
-def dvphi(v):
-    i = get_part_index(v)
-    return v.data["PART_X3"] - v.data["VX3"][i]
-
-
-def dvz(v):
-    i = get_part_index(v)
-    return v.data["PART_X2"] - v.data["VX2"][i]
-
-
 def vphi_mb(v):
     R = v.x
     Omega = np.pow(R, -1.5)
@@ -102,27 +75,15 @@ def prs(v):
     return v.data["cs"] * v.data["RHO"]
 
 
+def cs(v):
+    return np.sqrt(v.data["PRS"] / v.data["RHO"])
+
+
+def ylim(ax, v):
+    ax.set_ylim(0, 1e-1)
+
+
 quantities = [
-    PartQuantity(
-        "PART_X1",
-        r"$r^\mathrm{part}$",
-        plot_coords=[0, 0],
-        ref_function=analytical_trajectory(1),
-    ),
-    # SpaceTimeHeatmap(
-    #     "Dust0_RHO",
-    #     r"$\rho^\mathrm{dust}$",
-    #     plot_coords=[0, 0],
-    #     # uids="all",
-    #     ref_function=analytical_trajectory,
-    # ),
-    # SpaceTimeHeatmap(
-    #     "VX1",
-    #     r"$v_r$",
-    #     plot_coords=[0, 1],
-    #     uids="all",
-    #     ref_function=analytical_trajectory,
-    # ),
     LineMovie1D(
         "VX1",
         r"$v_r$",
@@ -150,97 +111,21 @@ quantities = [
         # uids="all",
         # bounds=[-1e-4, 1e-4],
     ),
-    LineMovie1D(
-        "RHO",
-        r"$\rho$",
-        plot_coords=[0, 4],
-        uids="all",
-    ),
+    LineMovie1D("RHO", r"$\rho$", plot_coords=[0, 4], uids="all", customize=ylim),
     LineMovie1D(
         "cs",
         r"$c_s$",
         plot_coords=[0, 5],
         uids=uids,
     ),
-    LineMovie1D(
-        "PRS",
-        r"$P$",
-        title="Pressure (zoomed)",
-        plot_coords=[0, 6],
-        uids=uids,
-        compute=prs,
-        bounds=[1e-3, 5e-3],
-    ),
-    LocalQuantity("vr_local", localkey="VX1", plot_coords=[1, 1], uids="all"),
-    PartQuantity(
-        "drag",
-        "",
-        plot_coords=[1, 0],
-        uids="all",
-        compute=drag_force,
-        style_kwargs={"label": "Drag"},
-    ),
-    PartQuantity(
-        "grav",
-        "",
-        plot_coords=[1, 0],
-        uids="all",
-        compute=grav_force,
-        style_kwargs={"label": "Gravity", "color": "lightblue"},
-    ),
-    PartQuantity(
-        "centrifugal",
-        "",
-        plot_coords=[1, 0],
-        uids="all",
-        compute=centrifugal_force,
-        style_kwargs={"label": "Centrifugal", "color": "magenta"},
-    ),
-    PartQuantity(
-        "total_force",
-        symbol="accelerations",
-        title="Radial forces on the particle",
-        plot_coords=[1, 0],
-        uids="all",
-        compute=total_force,
-        style_kwargs={"label": "Total force", "color": "lightgreen"},
-    ),
-    PartQuantity(
-        "total_force",
-        symbol="accelerations",
-        title="Zoom on the total force on the particle",
-        plot_coords=[2, 0],
-        uids="all",
-        style_kwargs={"label": "Total force", "color": "lightgreen"},
-    ),
-    PartQuantity(
-        "dvr",
-        r"$v_r^\mathrm{part}-v_r$",
-        plot_coords=[1, 1],
-        compute=dvr,
-        uids="all",
-    ),
-    PartQuantity(
-        "dvphi",
-        r"$v_\phi^\mathrm{part}-v_\phi$",
-        plot_coords=[1, 2],
-        compute=dvphi,
-        uids="all",
-    ),
-    PartQuantity(
-        "dvz",
-        r"$v_z^\mathrm{part}-v_z$",
-        plot_coords=[1, 3],
-        compute=dvz,
-        uids="all",
-    ),
-    LocalQuantity(
-        "prs_local",
-        title="Pressure read (?) by the particle",
-        localkey="PRS",
-        plot_coords=[1, 6],
-        uids="all",
-    ),
+    # LineMovie1D(
+    #     "PRS",
+    #     r"$P$",
+    #     title="Pressure (zoomed)",
+    #     plot_coords=[0, 6],
+    #     uids=uids,
+    #     bounds=[1e-3, 5e-3],
+    # ),
 ]
 
 # quantities = [

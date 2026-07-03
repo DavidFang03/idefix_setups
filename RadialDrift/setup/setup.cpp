@@ -52,7 +52,9 @@ void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
 //   idefix_for("MyDrag", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) { gamma(k, j, i) = pow(x1(i), CsSlope) / sigma0 / beta; });
 // }
 
-void MyDrag(DataBlock *data, int nSpecie, real beta, IdefixArray3D<real> &gamma) {
+// void MyDrag(DataBlock *data, int nSpecie, real beta, IdefixArray3D<real> &gamma) {
+void MyDrag(DataBlock *data, real beta, IdefixArray3D<real> &gamma) {
+
   // Compute the drag coefficient gamma from the input beta
   auto VcGas = data->hydro->Vc;
   idefix_for("MyDrag", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) { gamma(k, j, i) = 1 / (beta * VcGas(RHO, k, j, i)); });

@@ -10,6 +10,7 @@ real HidealGlob;
 real gammaGlob;
 real densityFloorGlob;
 real alphaGlob;
+real sizeGlob;
 
 void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
   IdefixArray1D<real> x1 = data.x[IDIR];
@@ -18,7 +19,7 @@ void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
   real CsSlope = CsSlopeGlob;
   idefix_for(
       "MySoundSpeed", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-        real R = x1(i) * sin(x2(j));
+        real R = x1(i);
         // real h = h0 * pow(R, CsSlope +)
         cs(k, j, i) = R * h0 * pow(R, CsSlope - 1);
       });
@@ -64,6 +65,13 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
   auto *data = hydro->data;
   IdefixArray1D<real> x1 = data->x[IDIR];
   IdefixArray1D<real> x2 = data->x[JDIR];
+  IdefixArray1D<real> x3 = data->x[KDIR];
+
+  real h0 = h0Glob;
+  real sigmaSlope = sigmaSlopeGlob;
+  real sigma0 = sigma0Glob;
+
+  real CsSlope = CsSlopeGlob;
 
   if (dir == IDIR) {
     if (side == left) {
@@ -72,24 +80,25 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
       idefix_for(
           "UserDefBoundary_Left", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, ibeg, KOKKOS_LAMBDA(int k, int j, int i) {
             const int irefl = 2 * ibeg - 1 - i;
-            real r = x1(i);
-            real theta = x2(j);
-            real R = r * sin(theta);
+            real R = x1(i);
+            real z = x3(i);
             real Omega = pow(R, -1.5);
 
-            // Reflective / continuous density boundary
+            real cs2 = h0 * h0 * pow(R, 2 * CsSlope);
+            real hg2 = cs2 / Omega / Omega;
+
             Vc(RHO, k, j, i) = Vc(RHO, k, j, irefl);
 
-            // Diode boundary: Allow outflow (negative VX1), kill inflow (positive VX1)
-            // Note: We check the active cell at 'ibeg' to determine the state
+            // Vc(VX1, k, j, i) = Vc(VX1, k, j, irefl);
+            Vc(VX1, k, j, i) = Vc(VX1, k, j, ibeg);
             if (Vc(VX1, k, j, ibeg) > ZERO_F) {
               Vc(VX1, k, j, i) = -Vc(VX1, k, j, irefl); // Block inflow
             } else {
               Vc(VX1, k, j, i) = Vc(VX1, k, j, irefl); // Allow natural outflow (mirrored or copied)
             }
 
-            Vc(VX2, k, j, i) = Vc(VX2, k, j, irefl); // Mirror vertical velocity
-            Vc(VX3, k, j, i) = R * Omega;            // Mirror vertical velocity
+            Vc(VX3, k, j, i) = Vc(VX3, k, j, irefl);
+            Vc(VX2, k, j, i) = R * Omega * (1 + 0.5 * (hg2 / R / R) * (sigmaSlope - 1.0 + 2 * CsSlope + 2 * CsSlope * z * z / 2.0 / hg2)); // Mirror vertical velocity
           });
 
     } else if (side == right) {
@@ -105,13 +114,14 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 
             // Diode boundary: Allow outflow (positive VX1), kill inflow (negative VX1)
             if (Vc(VX1, k, j, iend - 1) < ZERO_F) {
-              Vc(VX1, k, j, i) = -Vc(VX1, k, j, irefl); // Block inflow
+              Vc(VX1, k, j, i) = -Vc(VX1, k, j, irefl);
             } else {
-              Vc(VX1, k, j, i) = Vc(VX1, k, j, irefl); // Allow natural outflow
+              Vc(VX1, k, j, i) = Vc(VX1, k, j, irefl);
             }
+            // Vc(VX1, k, j, i) = 0.0;
 
-            Vc(VX2, k, j, i) = Vc(VX2, k, j, irefl);
             Vc(VX3, k, j, i) = Vc(VX3, k, j, irefl);
+            Vc(VX2, k, j, i) = Vc(VX2, k, j, irefl);
           });
     }
   }
@@ -122,21 +132,19 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
       idefix_for(
           "UserDefBoundary_Left", 0, data->np_tot[KDIR], 0, jbeg, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
             const int jrefl = 2 * jbeg - 1 - j;
-            real r = x1(i);
-            real theta = x2(j);
-            real R = r * sin(theta);
+            real R = x1(i);
             real Omega = pow(R, -1.5);
 
             Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
 
-            if (Vc(VX2, k, jbeg, i) > ZERO_F) {
-              Vc(VX2, k, j, i) = 0.0; // Block inflow
+            if (Vc(VX3, k, jbeg, i) > ZERO_F) {
+              Vc(VX3, k, j, i) = 0.0; // Block inflow
             } else {
-              Vc(VX2, k, j, i) = Vc(VX2, k, jrefl, i); // Allow natural outflow (mirrored or copied)
+              Vc(VX3, k, j, i) = Vc(VX3, k, jrefl, i); // Allow natural outflow (mirrored or copied)
             }
 
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i); // Mirror vertical velocity
-            Vc(VX3, k, j, i) = R * Omega;            // Mirror vertical velocity
+            Vc(VX2, k, j, i) = R * Omega;            // Mirror vertical velocity
           });
 
     } else if (side == right) {
@@ -150,14 +158,14 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 
             Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
 
-            if (Vc(VX2, k, jend - 1, i) < ZERO_F) {
-              Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i); // Block inflow
+            if (Vc(VX3, k, jend - 1, i) < ZERO_F) {
+              Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i); // Block inflow
             } else {
-              Vc(VX2, k, j, i) = Vc(VX2, k, jrefl, i); // Allow natural outflow
+              Vc(VX3, k, j, i) = Vc(VX3, k, jrefl, i); // Allow natural outflow
             }
 
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
-            Vc(VX3, k, j, i) = Vc(VX3, k, jrefl, i);
+            Vc(VX2, k, j, i) = Vc(VX2, k, jrefl, i);
           });
     }
   }
@@ -218,6 +226,11 @@ void UserdefBoundaryParticles(DataBlock &data, real t, int dir, BoundarySide sid
 void MyDrag(DataBlock *data, real beta, IdefixArray3D<real> &gamma) {
   // Compute the drag coefficient gamma from the input beta
   auto VcGas = data->hydro->Vc;
+
+  real rho0 = 6.0e-10;
+  real rhos = 1.0; // 1 g/cm3
+  real au = 1.5e11;
+  real realbeta = rhos * sizeGlob / (rho0 * au);
   // auto VcDust = data->dust[nSpecie]->Vc;
   // auto cs = data->hydro->cs;
   IdefixArray1D<real> x1 = data->x[IDIR];
@@ -227,12 +240,13 @@ void MyDrag(DataBlock *data, real beta, IdefixArray3D<real> &gamma) {
 
   idefix_for(
       "MyDrag", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-        gamma(k, j, i) = 1 / (beta * VcGas(RHO, k, j, i));
-        // // real cs = sqrt(VcGas(PRS, k, j, i) / VcGas(RHO, k, j, i));
-        // real R = x1(i);
-        // real cs = h0 * pow(R, CsSlope);
+        // gamma(k, j, i) = 1 / (beta * VcGas(RHO, k, j, i));
+        // real cs = sqrt(VcGas(PRS, k, j, i) / VcGas(RHO, k, j, i));
+        real R = x1(i);
+        real realbetaloc = realbeta;
+        real cs = h0 * pow(R, CsSlope);
 
-        // gamma(k, j, i) = cs / beta;
+        gamma(k, j, i) = cs / realbetaloc;
       });
 }
 
@@ -252,15 +266,15 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
             real R = x1(i);
             real Vk = 1.0 / sqrt(R);
 
-            Vc(RHO, k, j, i) = Vc(RHO, k, j, 2 * ighost - i - 1);
+            Vc(RHO, k, j, i) = 1e-5;
             if (Vc(VX1, k, j, ighost) >= ZERO_F) {
-              Vc(VX1, k, j, i) = 0.0;
+              Vc(VX1, k, j, i) = -Vc(VX1, k, j, 2 * ighost - i + 1);
             } else {
               // Vc(VX1,k,j,i) = - Vc(VX1,k,j,2*ighost - i +1);
               Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
             }
-            Vc(VX2, k, j, i) = Vc(VX2, k, j, 2 * ighost - i - 1);
-            Vc(VX3, k, j, i) = Vk;
+            Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
+            Vc(VX2, k, j, i) = Vk;
           });
     } else if (side == right) {
       ighost = data->end[IDIR] - 1;
@@ -279,8 +293,8 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
             // if(Vc(VX1,k,j,i)<=ZERO_F){
             //   Vc(VX1,k,j,ighost) = 0.0;
             // }
-            Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
-            Vc(VX3, k, j, i) = Vk;
+            Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
+            Vc(VX2, k, j, i) = Vk;
           });
     }
   }
@@ -291,21 +305,19 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
       idefix_for(
           "UserDefBoundary_Left", 0, data->np_tot[KDIR], 0, jbeg, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
             const int jrefl = 2 * jbeg - 1 - j;
-            real r = x1(i);
-            real theta = x2(j);
-            real R = r * sin(theta);
+            real R = x1(i);
             real Omega = pow(R, -1.5);
 
-            Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
+            Vc(RHO, k, j, i) = Vc(RHO, k, jbeg, i);
 
-            if (Vc(VX2, k, jbeg, i) > ZERO_F) {
-              Vc(VX2, k, j, i) = 0.0; // Block inflow
+            if (Vc(VX3, k, jbeg, i) > ZERO_F) {
+              Vc(VX3, k, j, i) = 0.0; // Block inflow
             } else {
-              Vc(VX2, k, j, i) = Vc(VX2, k, jrefl, i); // Allow natural outflow (mirrored or copied)
+              Vc(VX3, k, j, i) = Vc(VX3, k, jbeg, i); // Allow natural outflow (mirrored or copied)
             }
 
-            Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i); // Mirror vertical velocity
-            Vc(VX3, k, j, i) = R * Omega;            // Mirror vertical velocity
+            Vc(VX1, k, j, i) = Vc(VX1, k, jbeg, i); // Mirror vertical velocity
+            Vc(VX2, k, j, i) = R * Omega;           // Mirror vertical velocity
           });
 
     } else if (side == right) {
@@ -317,16 +329,16 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
             real R = x1(i);
             real Vk = 1.0 / sqrt(R);
 
-            Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
+            Vc(RHO, k, j, i) = Vc(RHO, k, jend, i);
 
-            if (Vc(VX2, k, jend - 1, i) < ZERO_F) {
-              Vc(VX2, k, j, i) = 0.0; // Block inflow
+            if (Vc(VX3, k, jend - 1, i) < ZERO_F) {
+              Vc(VX3, k, j, i) = 0.0; // Block inflow
             } else {
-              Vc(VX2, k, j, i) = Vc(VX2, k, jrefl, i); // Allow natural outflow
+              Vc(VX3, k, j, i) = Vc(VX3, k, jend, i); // Allow natural outflow
             }
 
-            Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
-            Vc(VX3, k, j, i) = Vk;
+            Vc(VX1, k, j, i) = Vc(VX1, k, jend, i);
+            Vc(VX2, k, j, i) = Vk;
           });
     }
   }
@@ -404,7 +416,7 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) // : m_p
     int nSpecies = data.dust.size();
     for (int n = 0; n < nSpecies; n++) {
       data.dust[n]->EnrollUserDefBoundary(&UserdefBoundaryDust);
-      // data.dust[n]->drag->EnrollUserDrag(&MyDrag);
+      data.dust[n]->drag->EnrollUserDrag(&MyDrag);
     }
   }
 
@@ -412,6 +424,8 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) // : m_p
   sigma0Glob = input.Get<real>("Setup", "sigma0", 0);
   CsSlopeGlob = input.Get<real>("Setup", "CsSlope", 0);
   h0Glob = input.Get<real>("Setup", "h0", 0);
+
+  sizeGlob = input.Get<real>("Particles", "stopping_time", 1);
 
   output.EnrollUserDefVariables(&ComputeUserVars);
 }
@@ -433,41 +447,45 @@ void Setup::InitFlow(DataBlock &data) {
   for (int k = 0; k < d.np_tot[KDIR]; k++) {
     for (int j = 0; j < d.np_tot[JDIR]; j++) {
       for (int i = 0; i < d.np_tot[IDIR]; i++) {
-        real r = d.x[IDIR](i);
-        real theta = d.x[JDIR](j);
+        real R = d.x[IDIR](i);
+        real z = d.x[KDIR](k);
 
-        real z = r * cos(theta);
-        real R = r * sin(theta);
         real OmegaK = pow(R, -1.5);
         real cs2 = h0 * h0 * pow(R, 2 * CsSlope);
         real hg2 = cs2 / OmegaK / OmegaK;
 
         d.Vc(RHO, k, j, i) = 1e-6 + sigma0 * pow(R, sigmaSlope - 1.0) * exp(-z * z / (2 * hg2));
         d.Vc(VX1, k, j, i) = 0.0;
-        d.Vc(VX2, k, j, i) = 0.0;
-        // d.Vc(VX3, k, j, i) = R * OmegaK;
-        d.Vc(VX3, k, j, i) = R * OmegaK * (1 + 0.5 * (hg2 / R / R) * (sigmaSlope - 1.0 + 2 * CsSlope + 2 * CsSlope * z * z / 2.0 / hg2));
+        d.Vc(VX3, k, j, i) = 0.0;
+        // d.Vc(VX2, k, j, i) = R * OmegaK;
+        d.Vc(VX2, k, j, i) = R * OmegaK * (1 + 0.5 * (hg2 / R / R) * (sigmaSlope - 1.0 + 2 * CsSlope + 2 * CsSlope * z * z / 2.0 / hg2));
 
         for (int n = 0; n < data.dust.size(); n++) {
           d.dustVc[n](RHO, k, j, i) = (1e-5 + 1e-2 * exp(-0.5 * (R - 2.0) * (R - 2.0) / 0.05 / 0.05)) * exp(-0.5 * (z * z) / (0.2 * 0.2)) * d.Vc(RHO, k, j, i);
           d.dustVc[n](VX1, k, j, i) = 0.0;
-          d.dustVc[n](VX2, k, j, i) = 0.0;
-          d.dustVc[n](VX3, k, j, i) = R * OmegaK;
+          d.dustVc[n](VX3, k, j, i) = 0.0;
+          d.dustVc[n](VX2, k, j, i) = R * OmegaK;
         }
       }
     }
   };
 
+  real rho0 = 6.0e-10;
+  real rhos = 1.0; // 1 g/cm3
+  real au = 1.5e11;
+  real beta = rhos * sizeGlob / (rho0 * au);
+
   for (int n = 0; n < d.PactiveCount; n++) {
     //   // d.dustVc[n](RHO, k, j, i) = (1e-5 + 3e-3 * exp(-0.5 * (R - 2.0) * (R - 2.0) / 0.1 / 0.1)) * d.Vc(RHO, k, j, i); //
     real r = 2.0;
     d.Ps(PX1, n) = r;
-    d.Ps(PX2, n) = 1.5707963267948966;
+    d.Ps(PX2, n) = 0.0;
     d.Ps(PX3, n) = 0.0;
     d.Ps(PVX1, n) = 0.0;
-    d.Ps(PVX2, n) = 0.0;
-    d.Ps(PVX3, n) = 1 / sqrt(r);
+    d.Ps(PVX3, n) = 0.0;
+    d.Ps(PVX2, n) = 1 / sqrt(r);
     d.Ps(PMASS, n) = 1e-3;
+    d.Ps(DRAGCOEFF, n) = beta;
   }
 
   // Send it all, if needed

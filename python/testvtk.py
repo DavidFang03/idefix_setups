@@ -1,60 +1,21 @@
 # %%
-from .vtk_io import readVTK
+from idefix2python import readVTK
 import numpy as np
 import matplotlib.pyplot as plt
 import glob
 
-# # path = "/home/dp316/dp316/dc-fang1/IdefixRuns/DriftSettling/outputs/DS_test/vtks/data.0000.vtk"
-path = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/outputs/reload_Epstein2_wind/vtks/part.0000.vtk"
-vtk = readVTK(path)
-data = vtk.data
-print(data["TSTOP"])
+for i in range(2):
+    path = f"/home/dfang/Code/idefix_setups/RadialDrift/outputs/Drift_Tau/vtks/part.000{i}.vtk"
+    # path = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/outputs/reload_Epstein2_wind/vtks/part.0000.vtk"
+    vtk = readVTK(path)
+    data = vtk.data
+    print(data.keys())
 
-# for key in data:
-#     print(key)
-#     # print(data[key])
-
-# print(vtk.geometry)
-
-# print(np.average(vtk.data["Dust0_RHO"]))
-# print(vtk.x)
-
-# for key in data:
-#     print(key)
-
-# import glob
-
-# for path in glob.glob(
-#     "/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/outputs/Drift_Tau/vtks/*.vtk"
-# ):
-#     print(path)
-#     vtk = readVTK(path)
-#     print(np.min(vtk.x))
-#     # plt.plot(vtk.x)
-#     # plt.savefig("test.png")
-
-# # tu-c0r0n75
-v = readVTK(
-    "/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/outputs/DriftL_Tau/vtks/data.0001.vtk"
-)
-print(v.data.keys())
-print(np.shape(v.data["RHO"][:, :, 0]))
-plt.plot(v.x, np.transpose(v.data["RHO"][:, 0, 0]))
-# plt.plot(v.x, 0.05 * v.x ** (-0.5))
-# # tu-c0r0n93
-# for proc in range(4):
-#     # for npy in glob.glob("/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/setup/*.npy"):
-#     npy = f"/home/dp316/dp316/dc-fang1/IdefixRuns/RadialDrift/setup/debugRHO_proc{proc}.npy"
-#     data = np.load(npy)
-#     print(data)
-#     plt.plot(data[0, 0, :])
-
-
-# tu-c0r0n75
-# v = readVTK("/home/dp316/dp316/dc-fang1/myidefix/test/HD/FargoPlanet/data.0000.vtk")
-# x, y = np.meshgrid(v.x, v.y)
-# print(np.shape(v.data["RHO"][:, :, 0]))
-# plt.pcolormesh(x, y, np.transpose(v.data["RHO"][:, :, 0]))
-# plt.plot(v.x, np.transpose(v.data["RHO"][:, 0, 0]))
+    print(vtk.r)
+    print(vtk.theta)
+    print(vtk.phi)
+    print(data["VX1"])
+    print(data["VX2"])
+    print(data["VX3"])
 
 # %%

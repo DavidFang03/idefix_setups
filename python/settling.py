@@ -1,4 +1,4 @@
-from idefix2python import RunContext, Pipeline, SpaceTimeHeatmap
+from idefix2python import RunContext, Pipeline, SpaceTimeHeatmap, PartQuantity
 import utilities
 
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/VerticalSettling"
@@ -14,8 +14,8 @@ def analytical_trajectory(t):
 
 
 custom_spaceTimeHeatmaps = [
-    SpaceTimeHeatmap(
-        "Dust0_RHO",
+    PartQuantity(
+        "PART_X3",
         r"$\rho^\mathrm{dust}$",
         plot_coords=[0, 0],
         title="Dust0 Density",
@@ -23,6 +23,15 @@ custom_spaceTimeHeatmaps = [
         cmap="inferno",
         ref_function=analytical_trajectory,
     )
+    # SpaceTimeHeatmap(
+    #     "Dust0_RHO",
+    #     r"$\rho^\mathrm{dust}$",
+    #     plot_coords=[0, 0],
+    #     title="Dust0 Density",
+    #     norm="log",
+    #     cmap="inferno",
+    #     ref_function=analytical_trajectory,
+    # )
 ]
 
 runContext = RunContext(task, projectPath, configPath=configPath)

@@ -24,9 +24,9 @@ my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
 # my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/myidefix";                            # The directory where calculations are run
-my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/IdefixGeoffroy";                            # The directory where calculations are run
+my $IDEFIX_DIR      = "/home/dfang/Code/Lidefix";                            # The directory where calculations are run
 my $folder_name     = "RadialDrift";
-my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
+my $folder_path     = "/home/dfang/Code/idefix_setups/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
 my $qos             = "dev";
@@ -36,9 +36,9 @@ my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
-my $name            = "DriftL_2048";
+my $name            = "Drift_Size";
 
-my @mysubnames = ("Size1e-2_custom");
+my @mysubnames = ("clean");
 
 my @indexes = (0);
 
@@ -58,7 +58,7 @@ open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
-X1-grid    1  0.4      2048  u  2.5
+X1-grid    1  0.4      768  l  2.5
 X2-grid    1  -0.0125      1  u  0.0125
 X3-grid    1  -0.0125  1    u  0.0125
 
@@ -80,7 +80,7 @@ drag_feedback    no
 
 [Particles]
 count            per_proc  1
-stopping_time    userdef  0.01
+stopping_time    size  1
 ParticleMass     3e-3
 
 [Gravity]
@@ -92,8 +92,8 @@ X1-beg    userdef
 X1-end    userdef
 X2-beg    periodic
 X2-end    periodic
-X3-beg    outflow
-X3-end    outflow
+X3-beg    periodic
+X3-end    periodic
 
 [Setup]
 sigma0        0.125
@@ -104,7 +104,8 @@ alpha         1.0e-4
 
 [Output]
 # uservar       st
-vtk    10.0
+uservar    cs
+vtk    3.0
 dmp    100.0
 log        1000
 dmp_dir    $outputs_path_1

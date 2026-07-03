@@ -24,10 +24,9 @@ my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
 # my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/myidefix";                            # The directory where calculations are run
-# my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/myidefix";                            # The directory where calculations are run
-my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/IdefixGeoffroy";                            # The directory where calculations are run
+my $IDEFIX_DIR      = "/home/dfang/Code/Lidefix";                            # The directory where calculations are run
 my $folder_name     = "VerticalSettling";
-my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
+my $folder_path     = "/home/dfang/Code/idefix_setups/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
 my $qos             = "dev";
@@ -36,21 +35,20 @@ my $gres            = "gpu:".$gpus;
 my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
-my $options         = "-dec 1 1 1" ;
-my $name            = "SettlingL";
-# my $name            = "Settling";
+my $options         = "-dec ".$gpus ;
+my $name            = "Settling_Size";
 
-my @mysubnames = ("Tau");
+my @mysubnames = ("clean");
 
 my @indexes = (0);
 
+# `mkdir -p $indir`;
 for my $index (@indexes) {
 print $index."\n";
 my $stringdx_1 = $name."_".$mysubnames[$index]; #OW_test
 my $outputs_path_1 = $folder_path."outputs/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
 my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
 `mkdir -p $vtksdir1`;
-print $vtksdir1."\n";
 
 ##################### .ini file #####################
 my $idefix_limit = $time_results{idefix} * 0.99;
@@ -62,7 +60,7 @@ print INI <<ENDOFINI;
 [Grid]
 X1-grid    1  1.99      1  u  2.01
 X2-grid    1  -0.0125      1  u  0.0125
-X3-grid    1  -0.15  512    u  0.3
+X3-grid    1  -0.15  256    u  0.3
 
 [TimeIntegrator]
 CFL         0.5
@@ -75,28 +73,26 @@ solver    hllc
 csiso     userdef
 # viscosity    explicit  userdef
 
-# [Dust]
-# nSpecies         3
-# drag             tau  1   0.2   0.04    # St=1, 0.2, 0.04
-# drag_feedback    no
+[Dust]
+nSpecies         1
+drag             userdef  1    # St=1, 0.2, 0.04
+drag_feedback    no
 
 [Particles]
 count            per_proc  1
-stopping_time    constant  1.0
-ParticleMass     3e-3
-DustToGas        3e-3
+stopping_time    size  1.0
 
 [Gravity]
 potential    central 
 Mcentral     1.0
 
 [Boundary]
-X1-beg    userdef
-X1-end    userdef
+X1-beg    periodic
+X1-end    periodic
 X2-beg    periodic
 X2-end    periodic
-X3-beg    outflow
-X3-end    outflow
+X3-beg    userdef
+X3-end    userdef
 
 [Setup]
 sigma0        0.125
@@ -106,7 +102,8 @@ h0            0.05
 alpha         1.0e-4
 
 [Output]
-vtk    0.1
+uservar    cs
+vtk    0.05
 dmp    1000.0
 log        1000
 dmp_dir    $outputs_path_1

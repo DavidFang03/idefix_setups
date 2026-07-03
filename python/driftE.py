@@ -10,7 +10,7 @@ RUNS_FOLDER_PATH = os.getenv("RUNS_FOLDER_PATH")
 
 projectPath = f"{RUNS_FOLDER_PATH}/RadialDrift"
 beta = 1e-2
-task = "DriftL_2048_Size1e-2_custom"
+task = "Drift_Size_clean"
 
 
 class analytical_trajectory:
