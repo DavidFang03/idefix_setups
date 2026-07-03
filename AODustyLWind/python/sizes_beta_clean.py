@@ -9,7 +9,6 @@ from cmap import Colormap
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from idefix2python import readVTK
 
-# --- Global Configurations & Formatters ---
 EXT = "png"
 CMAP_MESH = "viridis"
 CMAP_SLOPE = Colormap("chrisluts:bop_blue").to_mpl()
@@ -24,14 +23,7 @@ plt.style.use("dark_background")
 
 root_name = "dw100_v2_thin"
 
-# =====================================================================
-# --- PLOT METRIC CONTROLLER ---
-# Configure your choices here to keep metrics and labels aligned perfectly!
-# =====================================================================
-# =====================================================================
-# --- PLOT METRIC CONTROLLER ---
-# Configure your choices here to keep metrics and labels aligned perfectly!
-# =====================================================================
+
 METRIC_CONFIG = {
     "0": {"label": r"$\beta_\mathrm{mid}$", "legend": r"\beta_\mathrm{{mid}}"},
     "A": {"label": r"$\beta_\mathrm{local}$", "legend": r"\beta_\mathrm{{local}}"},
@@ -40,7 +32,7 @@ METRIC_CONFIG = {
     "D": {"label": r"$r$ [au]", "legend": r"r"},
 }
 
-# CHOOSE YOUR ACTIVE METRIC HERE: "0", "A", "B", "C", or "D"
+# "0", "A", "B", "C", or "D"
 ACTIVE_OPTION = "B"
 
 X_AXIS_LABEL = METRIC_CONFIG[ACTIVE_OPTION]["label"]
@@ -139,7 +131,7 @@ def get_theta_trajectory(vtklist, target_uids):
 
 
 def calculate_cell_critical_size(second_vtk, cell_uids, final_thetas, Hideal, epsilon):
-    """Finds the critical Stokes threshold inside a single spatial cell safely."""
+    """Finds the critical Stokes inside a single spatial cell."""
     corona_angle = np.arctan(Hideal * epsilon)
 
     sizes = []
@@ -196,8 +188,7 @@ def calculate_cell_critical_size(second_vtk, cell_uids, final_thetas, Hideal, ep
 
 def plot_and_annotate_lines(ax, Xline, Hideal, epsilon):
     """
-    Plots lines relative to Hideal and annotates them at the far right,
-    perfectly inclined to match the visual slope of each line.
+    Plots lines relative to Hideal and annotates them
     """
     line_configs = [
         (Hideal - 2, f"${Hideal - 2}H$"),
@@ -282,7 +273,6 @@ def massloss(v, rmin=15, rmax=30, angle=None):
 
 
 def get_local_hydro_data(r, theta, hydro_vtk):
-    """Looks up closest cell coordinates on pre-cached baseline fluid structures."""
     r_mesh = np.atleast_1d(hydro_vtk.r)
     th_mesh = np.atleast_1d(hydro_vtk.theta)
 
@@ -332,7 +322,6 @@ def run_analysis():
     r_range = range(2, num_r)
     theta_range = range(num_theta)
 
-    # --- Build Master Coordinate Reference System ---
     print("Building geometry baseline layout from master reference...")
     ref_paths = sorted(glob.glob(f"{get_vtks_path(betas[0])}/part.*.vtk"))
     master_first_vtk = readVTK(ref_paths[0])
@@ -374,7 +363,7 @@ def run_analysis():
     table_data = np.zeros((len(betas), len(r_range), len(theta_range)))
     x_metrics_data = np.zeros((len(betas), len(r_range), len(theta_range)))
 
-    # --- Step 1: Extract Sizes Cross-Referencing Master Unique IDs ---
+    # 1: Extract unique ids
     for b_idx, beta in enumerate(betas):
         print(f"Processing beta model loop reference: {beta}...")
         vtks_path = get_vtks_path(beta)
@@ -392,7 +381,7 @@ def run_analysis():
         active_uids = set(last_vtk.data["uid"]).intersection(master_uid_to_idx.keys())
         thetas_history, times = get_theta_trajectory(paths, list(active_uids))
 
-        # Handle cases where active_uids returned empty configurations cleanly
+        # Handle cases where active_uids returned empty configurations
         if thetas_history.size > 0:
             final_thetas = thetas_history[-1]
         else:
@@ -422,7 +411,7 @@ def run_analysis():
                 )
                 table_data[b_idx, i, j] = size  ####### HEEEEEEEEEEEEEEEEEEERE
 
-                # --- Debugging Trajectory Profiler ---
+                # Debugging Trajectory Profiler
                 if (
                     i % 2 == 0
                     and j % 2 == 0
@@ -481,7 +470,7 @@ def run_analysis():
                     fig_db.savefig(debug_path, bbox_inches="tight", dpi=150)
                     plt.close(fig_db)
 
-    # --- Step 2: Continuous Path Trend Fitting & Plotting ---
+    # 2: Fit and plot
     print("Generating global trend lines and continuous power laws...")
     fig_lines, ax_lines = plt.subplots(figsize=(9, 8))
     grid_slope = np.full(X_grid.shape, np.nan)
@@ -547,7 +536,7 @@ def run_analysis():
     fig_lines.savefig(lines_path, dpi=300, bbox_inches="tight")
     plt.close(fig_lines)
 
-    # --- Step 3: Spatial Map Matrix ---
+    # 3: Map
     print("Generating final grid slope matrix map with text labels...")
     fig_mesh, ax_mesh = plt.subplots(figsize=(10, 6.5))
 
