@@ -19,8 +19,8 @@ sub format_time
     return %time;
 }
 
-my $minutes         = 960;
-my $gpus            = 1;
+my $minutes         = 1400;
+my $gpus            = 4;
 
 my %time_results    = format_time($minutes);
 my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/Lidefix";                            # The directory where calculations are run
@@ -29,16 +29,18 @@ my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
 my $qos             = "standard";
-my $nodes           = "1";
+my $nodes           = "2";
 my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
-my $options         = "-dec 1 1";
-my $name            = "clean_wind_100";
+my $options         = "-dec 4 2w";
+my $name            = "hr_wind";
 
-my @betas = ("1e3","3e3","5e3","7e3","1e4","2e4","4e4","6e4","1e5");
-my @indexes = (0,1,2,3,4,5,6,7,8);
+my @betas = ("1e3", "4e3", "7e3", "1e4", "4e4", "6e4", "8e4","1e5");
+my @indexes = (3);
+# my @indexes = (0,3,7);
+# my @indexes = (0,1,2,3,4,5,6,7);
 
 for my $index (@indexes) {
 print $index."\n";
@@ -57,14 +59,14 @@ open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
-X1-grid    1  1.0  768  l   100.0
-X2-grid    3  0.0  256   u  1.28   96  u  1.861592653589  256  u  3.141592653589793
+X1-grid    1  1.0  2048  l   100.0
+X2-grid    3  0.0  512   u  1.28   256  u  1.861592653589  512  u  3.141592653589793
 # X2-grid    1  0.0  1024  u  3.141592653589793
 
 [TimeIntegrator]
 CFL            0.9
 tstop          10000.0
-first_dt       1.e-6
+first_dt       1.e-8
 nstages        2
 max_runtime    $idefix_limit
 
@@ -87,21 +89,20 @@ X2-beg    userdef
 X2-end    userdef
 
 [Setup]
-Rm0                    10.0
+Rm0                    20.0
 etab0                  1.0
 epsilon                0.05
 beta                   $beta
-epsilonTop             0.3
-Hideal                 5.0
+epsilonTop             0.2 # just for temperature: Tcorona/Tdisk = (epsilonTop/epsilon)**2
+Hideal                 5.0 # height of the corona
 Am                     1.0
-densityFloor           1.0e-7
-transitionSmoothing    0.5
-# fromDump               true
-reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/reload_l/clean_wind.0001.dmp
+densityFloor           1.0e-9
+transitionSmoothing    0.2
+transitionSmoothingTemp    0.2
 
 [Output]
 uservar    eta    Am    InvDt
-vtk        50.0
+vtk        5.0
 dmp_dir    $outputs_path_1
 dmp        200
 log        1000

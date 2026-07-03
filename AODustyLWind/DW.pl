@@ -1,0 +1,179 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+# defining subroutine
+sub format_time
+{
+    # passing argument
+    my $minutes = $_[0];
+    my $left_minutes = $minutes % 60;
+    my $hours = int($minutes / 60);
+    my $slurm_format = sprintf("%02d:%02d:00", $hours, $left_minutes);
+    my $idefix_format = $minutes / 60;
+    my %time = (
+        slurm => $slurm_format,
+        idefix => $idefix_format
+        );
+    return %time;
+}
+
+my $minutes         = 960;
+my $gpus            = 1;
+
+my %time_results    = format_time($minutes);
+my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/Lidefix";                            # The directory where calculations are run
+my $folder_name     = "AODustyLWind";
+my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
+my $indir           = $folder_path."inputs_v2/";
+my $time            = $time_results{slurm};
+my $qos             = "standard";
+my $nodes           = "1";
+my $gres            = "gpu:$gpus";
+my $ntasks_per_node = $gpus;
+my $setup_dir      = $folder_path."reload_l";
+my $IDEFIX_EXE      = $setup_dir."/idefix";
+my $options         = "-dec $gpus 1";
+my $name            = "dw100_v3_thin_tv";
+
+# my @sizes = ("1e-5");
+my @betas = ("1e3", "4e3", "7e3", "1e4", "4e4", "6e4", "8e4","1e5");
+# my @betas = ("1e3", "3e3", "5e3", "7e3", "1e4", "2e4", "4e4", "6e4");
+# my @indexes = (3);
+my @indexes = (0, 1, 2, 3, 4, 5, 6, 7);
+
+for my $index (@indexes) {
+print $index."\n";
+my $beta = $betas[$index];
+my $reload_path = "/home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/outputs/clean_wind_100_v2_b".$beta."/dump.0012.dmp";
+my $stringdx_1 = $name."_b".$beta."_2000p"; #OW_test
+my $outputs_path_1 = $folder_path."outputs_v2/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
+my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
+`mkdir -p $vtksdir1`;
+
+##################### .ini file #####################
+my $idefix_limit = $time_results{idefix} * 0.99;
+print $indir."\n";
+`mkdir -p $indir`;
+my $inifile = $indir.$stringdx_1.".ini";
+open INI, ">$inifile";
+print INI <<ENDOFINI;
+##
+[Grid]
+X1-grid    1  1.0  768  l   100.0
+X2-grid    3  0.0  256   u  1.28   96  u  1.861592653589  256  u  3.141592653589793
+# X2-grid    1  0.0  1024  u  3.141592653589793
+
+[TimeIntegrator]
+CFL            0.9
+tstop          2000.0
+first_dt       1.e-6
+nstages        2
+max_runtime    $idefix_limit
+
+[Hydro]
+solver       hlld
+ambipolar    explicit  userdef
+resistivity  explicit  userdef
+gamma        1.0001
+
+
+# [Dust]
+# nSpecies         0
+# drag             userdef
+# drag_feedback    no
+
+[Particles]
+count            per_proc  4000 // = num_r * num_theta * num_size
+stopping_time    size
+num_r              10           // Number of radius steps
+num_theta          10           // Number of angle steps
+num_size           40           // Number of size steps
+thetamin           1.1479424006619559 # 9h
+# thetamax           1.3734007669450157 # 4h for h = 0.05, 4h is at theta=pi/2-pi/16 = 1.37
+thetamax           1.4219063791853992 # 3h for h = 0.05, 4h is at theta=pi/2-pi/16 = 1.37
+rmin               10.0
+rmax               30.0
+sizemin            1.0e-6 # in m
+sizemax            1.0e-4 # in m
+sort               false
+initialvelocity    tv
+fields_real        phi
+
+[Gravity]
+potential    central
+Mcentral     1.0
+bodyForce      userdef
+
+[Boundary]
+X1-beg    userdef
+X1-end    userdef
+X2-beg    userdef
+X2-end    userdef
+
+[Setup]
+Rm0                    20.0
+etab0                  1.0
+epsilon                0.05
+beta                   $beta
+epsilonTop             0.2 # just for temperature: Tcorona/Tdisk = (epsilonTop/epsilon)**2
+Hideal                 5.0 # height of the corona
+Am                     1.0
+densityFloor           1.0e-9
+transitionSmoothing    0.2
+transitionSmoothingTemp    0.2
+# fromDump               true
+reload_path             $reload_path
+
+[Output]
+uservar    eta    Am    InvDt
+vtk        2.0
+dmp_dir    $outputs_path_1
+dmp        50
+log        1000
+vtk_dir    $vtksdir1
+dat_path   $outputs_path_1/timevol.dat
+analysis   1
+
+# File produced automatically by a Perl script
+# Do not edit
+ENDOFINI
+
+# Batch script
+my $script = $indir.$stringdx_1.".sh";
+open SCRIPT, ">$script";
+print SCRIPT <<ENDOFSCRIPT;
+#!/bin/bash
+
+# Slurm job options (job-name, compute nodes, job time)
+#SBATCH --job-name=$stringdx_1
+#SBATCH --time=$time
+#SBATCH --partition=gpu
+#SBATCH --qos=$qos
+
+# Request right number of full nodes (48 cores by node for A100-80 GPU nodes))
+#SBATCH --nodes=$nodes
+#SBATCH --ntasks-per-node=$ntasks_per_node
+#SBATCH --gres=$gres
+#SBATCH --cpus-per-task=1
+
+#SBATCH --account=dp316
+
+cd $setup_dir
+# Load the correct modules for the run
+
+module load gcc/9.3.0
+module load openmpi/4.1.5-cuda12.3
+
+export OMP_NUM_THREADS=1
+export OMP_PLACES=cores
+
+srun --nodes=$nodes --ntasks-per-node=$ntasks_per_node \\
+     --hint=nomultithread  --distribution=block:block \\
+     /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \\
+     $IDEFIX_EXE $options -i $inifile -restart
+ENDOFSCRIPT
+`chmod u+x $script`;
+close SCRIPT;
+}

@@ -38,16 +38,17 @@ my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
 my $name            = "dwave";
 
-my @mysubnames = ("n1", "n10");
-my @n = (1, 10);
-my @runtimes = (20, 5);
+my @n = (1,2,4,6,8, 10);
+# my @runtimes = (20, 5);
+my @runtimes = map { 20 / $_ } @n;
+my @indexes = 0 .. $#n;
 
-my @indexes = (0,1);
+# my @indexes = (0,1,2,3,4);
 
 # `mkdir -p $indir`;
 for my $index (@indexes) {
 print $index."\n";
-my $stringdx_1 = $name."_".$mysubnames[$index]; #OW_test
+my $stringdx_1 = $name."_n".$n[$index]; #OW_test
 my $outputs_path_1 = $folder_path."outputs/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
 my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
 `mkdir -p $vtksdir1`;

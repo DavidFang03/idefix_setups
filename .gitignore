@@ -8,6 +8,7 @@
 **/git-state.txt
 **/idefix
 **/*.dmp
+**/*.dat
 **/*.cmake
 **/build/
 **/*.out
@@ -20,5 +21,6 @@
 Idefix2Python/
 *.npy
 *.ipynb
+*.pdf
 !AODustyLWind/reload_l/clean_wind.0002.dmp
 !AODustyLWind/reload_l/clean_wind_100.0001.dmp

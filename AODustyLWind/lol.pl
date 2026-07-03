@@ -19,7 +19,7 @@ sub format_time
     return %time;
 }
 
-my $minutes         = 960;
+my $minutes         = 240;
 my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
@@ -28,18 +28,19 @@ my $folder_name     = "AODustyLWind";
 my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
 my $indir           = $folder_path."inputs_v2/";
 my $time            = $time_results{slurm};
-my $qos             = "standard";
+my $qos             = "dev";
 my $nodes           = "1";
 my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."reload_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
-my $name            = "dw100_v2";
+my $name            = "dw100_intro";
 
 # my @sizes = ("1e-5");
-my @betas = ("1e3", "3e3", "5e3", "7e3", "1e4", "2e4", "4e4", "6e4");
-my @indexes = (4);
+my @betas = ("1e3", "4e3", "7e3", "1e4", "4e4", "6e4", "8e4","1e5");
+# my @betas = ("1e3", "3e3", "5e3", "7e3", "1e4", "2e4", "4e4", "6e4");
+my @indexes = (3);
 # my @indexes = (0, 1, 2, 3, 4, 5, 6, 7);
 
 for my $index (@indexes) {
@@ -87,14 +88,14 @@ gamma        1.0001
 count            per_proc  2000 // = num_r * num_theta * num_size
 stopping_time    size
 num_r              10           // Number of radius steps
-num_theta          10           // Number of angle steps
-num_size           20           // Number of size steps
+num_theta          5           // Number of angle steps
+num_size           40           // Number of size steps
 thetamin           1.1479424006619559 # 9h
 thetamax           1.3734007669450157 # 4h for h = 0.05, 4h is at theta=pi/2-pi/16 = 1.37
 rmin               2.0
-rmax               9.0
-sizemin            1.0e-9 # in m
-sizemax            1.0e-6 # in m
+rmax               22.0
+sizemin            1.0e-7 # in m
+sizemax            1.0e-3 # in m
 sort               false
 initialvelocity    same
 
@@ -116,7 +117,7 @@ beta                   $beta
 epsilonTop             0.3
 Hideal                 5.0
 Am                     1.0
-densityFloor           1.0e-7
+densityFloor           1.0e-10
 transitionSmoothing    0.5
 # fromDump               true
 reload_path             $reload_path

@@ -2,9 +2,9 @@
 
 # Slurm job options (job-name, compute nodes, job time)
 #SBATCH --job-name=dw100_v2_b3e3_2000p
-#SBATCH --time=16:00:00
+#SBATCH --time=01:00:00
 #SBATCH --partition=gpu
-#SBATCH --qos=standard
+#SBATCH --qos=dev
 
 # Request right number of full nodes (48 cores by node for A100-80 GPU nodes))
 #SBATCH --nodes=1

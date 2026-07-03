@@ -8,6 +8,7 @@ static real n;
 static real Sigma0;
 real PM;
 real tau;
+real perturbation_amplitude;
 
 void BodyForce(DataBlock &data, const real t, IdefixArray4D<real> &force) {
   idfx::pushRegion("BodyForce");
@@ -77,8 +78,6 @@ void UserdefStoppingTime(DataBlock &data, const real t, IdefixArray1D<real> &tst
   // real phi_beg = d.x[KDIR](kbeg);
   // real dphi = d.x[KDIR](kbeg + 1) - d.x[KDIR](kbeg);
 
-  real tau_local = tau;
-
   idefix_for(
       "StoppingTime", 0, data.particles->pack->maxActiveIndex + 1, KOKKOS_LAMBDA(int idx) {
         if (isActive(idx)) {
@@ -138,6 +137,7 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   vs = input.Get<real>("Hydro", "csiso", 1);
   Sigma0 = input.Get<real>("Setup", "Sigma0", 0);
   n = input.Get<real>("Setup", "n", 0);
+  perturbation_amplitude = input.Get<real>("Setup", "perturbation_amplitude", 0);
 
   PM = input.Get<real>("Particles", "ParticleMass", 0);
   tau = input.Get<real>("Particles", "tau", 0);
@@ -146,12 +146,12 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   data.particles->EnrollStoppingTime(&UserdefStoppingTime);
   data.particles->EnrollBodyForce(ParticleBodyForce);
 
-  if (data.haveDust) {
-    int nSpecies = data.dust.size();
-    for (int n = 0; n < nSpecies; n++) {
-      data.dust[n]->drag->EnrollUserDrag(&MyDrag);
-    }
-  }
+  // if (data.haveDust) {
+  //   int nSpecies = data.dust.size();
+  //   for (int n = 0; n < nSpecies; n++) {
+  //     data.dust[n]->drag->EnrollUserDrag(&MyDrag);
+  //   }
+  // }
 }
 
 // This routine initialize the flow
@@ -163,26 +163,34 @@ void Setup::InitFlow(DataBlock &data) {
   DataBlockHost d(data);
   real x;
 
-  real L = d.x[IDIR](d.end[IDIR] - 1) - d.x[IDIR](d.beg[IDIR]);
-  real kx = 2 * M_PI * n / L;
-  real kappa = 2 * Omega * (2 * Omega + shear);
+  real L = 1.0;
+  real kx = 2.0 * M_PI * n / L;
+  real kappa2 = 2.0 * Omega * (2.0 * Omega + shear);
+
+  real omega = sqrt(kappa2 + (kx * vs) * (kx * vs));
+  real vx1_amp = perturbation_amplitude * (omega / kx);
+
+  // 1. Correct the physics term to be (2*Omega - S) where S = -shear
+  real vx2_amp = perturbation_amplitude * ((2.0 * Omega + shear) / kx);
 
   for (int k = 0; k < d.np_tot[KDIR]; k++) {
     for (int j = 0; j < d.np_tot[JDIR]; j++) {
       for (int i = 0; i < d.np_tot[IDIR]; i++) {
         x = d.x[IDIR](i);
+        d.Vc(RHO, k, j, i) = Sigma0 + perturbation_amplitude * Sigma0 * cos(kx * x);
+        d.Vc(VX1, k, j, i) = vx1_amp * cos(kx * x);
 
-        d.Vc(RHO, k, j, i) = Sigma0 + 1.0e-3 * Sigma0 * cos(kx * x);
-        d.Vc(VX1, k, j, i) = 1.0e-3 * sqrt(kappa * kappa + (kx * vs) * (kx * vs)) / kx * cos(kx * x);
-        d.Vc(VX2, k, j, i) = shear * x + 1.0e-3 * (shear + 2 * Omega) / kx * sin(kx * x);
+        // 2. Flip to a NEGATIVE sine to perfectly match the complex -i phase
+        // of a forward-propagating wave.
+        d.Vc(VX2, k, j, i) = shear * x - vx2_amp * sin(kx * x);
         d.Vc(VX3, k, j, i) = 0.0;
 
-        for (int n = 0; n < data.dust.size(); n++) {
-          d.dustVc[n](RHO, k, j, i) = 1e-6 + exp(-0.5 * x * x / (0.001 * 0.001));
-          d.dustVc[n](VX1, k, j, i) = 0.0;
-          d.dustVc[n](VX2, k, j, i) = shear * x;
-          d.dustVc[n](VX3, k, j, i) = 0.0;
-        }
+        // for (int n = 0; n < data.dust.size(); n++) {
+        //   d.dustVc[n](RHO, k, j, i) = 1e-6 + exp(-0.5 * x * x / (0.001 * 0.001));
+        //   d.dustVc[n](VX1, k, j, i) = 0.0;
+        //   d.dustVc[n](VX2, k, j, i) = shear * x;
+        //   d.dustVc[n](VX3, k, j, i) = 0.0;
+        // }
       }
     }
   }
