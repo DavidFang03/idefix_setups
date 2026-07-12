@@ -82,6 +82,8 @@ def diffdust(v):
 def diffpart(v):
     return (np.abs(v.data["PART_X1"] - atraj(v.t))) / atraj(v.t)
 
+def St(v):
+    return v.data["TSTOP"]*v.data["PART_X1"]**(-1.5)
 
 def ylim(ax, v):
     ax.set_ylim(1e-4, 1e-1)
@@ -133,6 +135,17 @@ quantities = [
         xlabel=r"$t$ [yr]",
         style_kwargs={"label": "Particle", "color": "aqua"},
     ),
+    OneComponentOneVariable(
+        "St",
+        # r"$r-r_\mathrm{pred}$",
+        # title=rf"$s={size}\,\mathrm{{m}}$",
+        compute=St,
+        plot_coords=[2, 0],
+        yscale="log",
+        ylabel=r"St",
+        xlabel=r"$t$ [yr]",
+        style_kwargs={"label": "Particle", "color": "aqua"},
+    ),
 ]
 
 default_text_color = plt.rcParams['text.color']
@@ -145,7 +158,7 @@ fig0 = Fig(
                 "bbox":dict(facecolor="none", edgecolor="white"),
                 "ha":"left"},
     sharex=True,
-    gridspec_kw={"height_ratios": [2, 1.2]},
+    gridspec_kw={"height_ratios": [2, 1.2, 1.2]},
 )
 
 

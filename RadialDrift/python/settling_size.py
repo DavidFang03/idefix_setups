@@ -11,18 +11,26 @@ import utilities
 import numpy as np
 
 projectPath = "/home/dfang/Code/idefix_setups/VerticalSettling"
-task = "Settling_Size_clean"
+task = "Settling_Size_10_clean"
 
 runContext = RunContext(
     task,
     projectPath,
+    iniPath = projectPath+"/inputs/"+f"{task}.ini",
     pdf_mode=False,
 )
+
+h0 = runContext.inidata["Setup"]["h0"]
+cs0 = h0
+csSlope = runContext.inidata["Setup"]["CsSlope"]
+sigma0 = runContext.inidata["Setup"]["sigma0"]
+sigmaSlope = runContext.inidata["Setup"]["sigmaSlope"]
 
 
 beta = runContext.outputTypes_info["particles"].testData["DRAGCOEFF"][0]
 print(len(runContext.outputTypes_info["vtk"].testData["RHO"]))
 print(beta)
+tfinal = runContext.inidata["TimeIntegrator"]["tstop"]
 
 rho0 = 6.0e-10
 rhos = 1.0
@@ -43,10 +51,10 @@ class analytical_trajectory:
         z0 = 0.1
         r0 = 2
         fluid = utilities.Fluid(
-            cs0=0.05,
-            csSlope=-0.5,
-            sigma0=0.125,
-            sigmaSlope=-0.5,
+            cs0=cs0,
+            csSlope=csSlope,
+            sigma0=sigma0,
+            sigmaSlope=sigmaSlope,
             beta=self.beta,
             r0=r0,
             z0=z0,
@@ -62,9 +70,11 @@ class analytical_trajectory:
         # ).sol
         self.sol = solve_ivp(
             fluid.settling_system,
-            [0, 20],
+            [0, tfinal],
             [z0, 0],
             dense_output=True,
+            atol=1e-9,
+            rtol=1e-9,
             # method="LSODA",
             method="DOP853",
         ).sol
@@ -88,7 +98,7 @@ def diffdust(v):
 
 
 def diffpart(v):
-    return (np.abs(v.data["PART_X3"] - atraj(v.t))) / atraj(v.t)
+    return (np.abs(v.data["PART_X3"] - atraj(v.t))) / np.abs(atraj(v.t))
 
 
 def ylim(ax, v):
@@ -104,31 +114,19 @@ def ylim(ax, v):
 def label_func(uid, vtk):
     return "Particle"
 
+def St(v):
+    return v.data["TSTOP"]*v.data["PART_X1"]**(-1.5)
+
 
 quantities = [
-    # PartQuantity(
-    #     "PART_X3",
-    #     r"$\rho^\mathrm{dust}$",
-    #     title="",
-    #     plot_coords=[0, 0],
-    #     uids="all",
-    #     ref_function=atraj,
-    #     # style_kwargs={"cmap": "inferno"},
-    #     norm="log",
-    #     bounds=[1e-4, 1e-2],
-    #     xlabel="",
-    #     ylabel="$z$ [au]",
-    #     label_func=label_func,
-    #     parts_kwargs={"lw": 3, "color": "aqua"},
-    # ),
-    SpaceTimeHeatmap(
-        "Dust0_RHO",
+    PartQuantity(
+        "PART_X3",
         r"$\rho^\mathrm{dust}$",
         title="",
         plot_coords=[0, 0],
         uids="all",
         ref_function=atraj,
-        style_kwargs={"cmap": "inferno"},
+        # style_kwargs={"cmap": "inferno"},
         norm="log",
         bounds=[1e-4, 1e-2],
         xlabel="",
@@ -136,15 +134,30 @@ quantities = [
         label_func=label_func,
         parts_kwargs={"lw": 3, "color": "aqua"},
     ),
-    OneComponentOneVariable(
-        "diffdust",
-        # r"$\rho^\mathrm{dust}$",
-        # title=rf"$s={size}\,\mathrm{{m}}$",
-        plot_coords=[1, 0],
-        compute=diffdust,
-        # customize=ylim,
-        style_kwargs={"label": "Pressureless fluid", "color": "magenta"},
-    ),
+    # SpaceTimeHeatmap(
+    #     "Dust0_RHO",
+    #     r"$\rho^\mathrm{dust}$",
+    #     title="",
+    #     plot_coords=[0, 0],
+    #     uids="all",
+    #     ref_function=atraj,
+    #     style_kwargs={"cmap": "inferno"},
+    #     norm="log",
+    #     bounds=[1e-4, 1e-2],
+    #     xlabel="",
+    #     ylabel="$z$ [au]",
+    #     label_func=label_func,
+    #     parts_kwargs={"lw": 3, "color": "aqua"},
+    # ),
+    # OneComponentOneVariable(
+    #     "diffdust",
+    #     # r"$\rho^\mathrm{dust}$",
+    #     # title=rf"$s={size}\,\mathrm{{m}}$",
+    #     plot_coords=[1, 0],
+    #     compute=diffdust,
+    #     # customize=ylim,
+    #     style_kwargs={"label": "Pressureless fluid", "color": "magenta"},
+    # ),
     OneComponentOneVariable(
         "diffpart",
         # r"$r-r_\mathrm{pred}$",
@@ -153,6 +166,17 @@ quantities = [
         compute=diffpart,
         yscale="log",
         ylabel=r"Relative error",
+        xlabel=r"$t$ [yr]",
+        style_kwargs={"label": "Particle", "color": "aqua"},
+    ),
+    OneComponentOneVariable(
+        "St",
+        # r"$r-r_\mathrm{pred}$",
+        # title=rf"$s={size}\,\mathrm{{m}}$",
+        compute=St,
+        plot_coords=[2, 0],
+        yscale="log",
+        ylabel=r"St",
         xlabel=r"$t$ [yr]",
         style_kwargs={"label": "Particle", "color": "aqua"},
     ),
@@ -166,7 +190,7 @@ fig0 = Fig(
                 "bbox":dict(facecolor="none", edgecolor="white"),
                 "ha":"left"},
     sharex=True,
-    gridspec_kw={"height_ratios": [2, 1]},
+    gridspec_kw={"height_ratios": [2, 1,1]},
 )
 
 

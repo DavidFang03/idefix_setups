@@ -108,6 +108,7 @@ class Fluid:
 
     def azSettling(self, z, vz, t):
         r = self.sol_r(t)[0]
+        r=self.r0
         st = self.Stokes(r, z)
         OmegaK = r ** (-1.5)
         tstop = st / OmegaK

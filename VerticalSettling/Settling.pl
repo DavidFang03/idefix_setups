@@ -38,7 +38,7 @@ my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus ;
 my $name            = "Settling_Size";
 
-my @mysubnames = ("clean");
+my @mysubnames = ("10_clean");
 
 my @indexes = (0);
 
@@ -60,12 +60,13 @@ print INI <<ENDOFINI;
 [Grid]
 X1-grid    1  1.99      1  u  2.01
 X2-grid    1  -0.0125      1  u  0.0125
-X3-grid    1  -0.15  256    u  0.3
+X3-grid    1  -0.3  256    u  0.3
 
 [TimeIntegrator]
 CFL         0.5
-tstop       20
+tstop       200
 first_dt    1.0e-5
+fixed_dt    1.0e-3
 nstages     2
 
 [Hydro]
@@ -73,14 +74,14 @@ solver    hllc
 csiso     userdef
 # viscosity    explicit  userdef
 
-[Dust]
-nSpecies         1
-drag             userdef  1    # St=1, 0.2, 0.04
-drag_feedback    no
+# [Dust]
+# nSpecies         0
+# drag             userdef  1e-3    # St=1, 0.2, 0.04
+# drag_feedback    no
 
 [Particles]
 count            per_proc  1
-stopping_time    size  1.0
+stopping_time    size  1e1
 
 [Gravity]
 potential    central 
@@ -95,15 +96,14 @@ X3-beg    userdef
 X3-end    userdef
 
 [Setup]
-sigma0        0.125
+sigma0        1
 sigmaSlope    -0.5
 CsSlope       -0.5
 h0            0.05
-alpha         1.0e-4
 
 [Output]
 uservar    cs
-vtk    0.05
+vtk    1
 dmp    1000.0
 log        1000
 dmp_dir    $outputs_path_1

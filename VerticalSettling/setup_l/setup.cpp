@@ -315,13 +315,13 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) // : m_p
   h0Glob = input.Get<real>("Setup", "h0", 0);
 
   sizeGlob = input.Get<real>("Particles", "stopping_time", 1);
-  if (data.haveDust) {
-    int nSpecies = data.dust.size();
-    for (int n = 0; n < nSpecies; n++) {
-      data.dust[n]->EnrollUserDefBoundary(&UserdefBoundaryDust);
-      data.dust[n]->drag->EnrollUserDrag(&MyDrag);
-    }
-  }
+  // if (data.haveDust) {
+  //   int nSpecies = data.dust.size();
+  //   for (int n = 0; n < nSpecies; n++) {
+  //     data.dust[n]->EnrollUserDefBoundary(&UserdefBoundaryDust);
+  //     data.dust[n]->drag->EnrollUserDrag(&MyDrag);
+  //   }
+  // }
 
   output.EnrollUserDefVariables(&ComputeUserVars);
 }
@@ -356,12 +356,12 @@ void Setup::InitFlow(DataBlock &data) {
         d.Vc(VX3, k, j, i) = 0.0;
         d.Vc(VX2, k, j, i) = Vk * (1 + 0.5 * (hg2 / R / R) * (sigmaSlope - 1.0 + 2 * CsSlope + 2 * CsSlope * z * z / 2.0 / hg2));
 
-        for (int n = 0; n < data.dust.size(); n++) {
-          d.dustVc[n](RHO, k, j, i) = (1e-5 + 1e-2 * exp(-0.5 * (R - 2.0) * (R - 2.0) / 0.05 / 0.05)) * exp(-0.5 * (z - z0) * (z - z0) / (0.02 * 0.02)) * d.Vc(RHO, k, j, i);
-          d.dustVc[n](VX1, k, j, i) = 0.0;
-          d.dustVc[n](VX3, k, j, i) = 0.0;
-          d.dustVc[n](VX2, k, j, i) = Vk;
-        }
+        // for (int n = 0; n < data.dust.size(); n++) {
+        //   d.dustVc[n](RHO, k, j, i) = (1e-5 + 1e-2 * exp(-0.5 * (R - 2.0) * (R - 2.0) / 0.05 / 0.05)) * exp(-0.5 * (z - z0) * (z - z0) / (0.02 * 0.02)) * d.Vc(RHO, k, j, i);
+        //   d.dustVc[n](VX1, k, j, i) = 0.0;
+        //   d.dustVc[n](VX3, k, j, i) = 0.0;
+        //   d.dustVc[n](VX2, k, j, i) = Vk;
+        // }
       }
     }
   };
