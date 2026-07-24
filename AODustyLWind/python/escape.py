@@ -42,7 +42,6 @@ num_size = int(runContext.inidata["Particles"]["num_size"][0])
 
 
 uids_grid = np.arange(num_r * num_theta * num_size).reshape(num_r, num_theta, num_size)
-print(uids_grid.shape)
 
 same_r = uids_grid[-2, :, :].flatten()
 same_angle = uids_grid[:, 3, :].flatten()
@@ -125,17 +124,15 @@ def size(v):
 
 def colors(vtk):
     sizes = size(vtk)
-    print(len(sizes))
     norm = LogNorm(vmin=np.min(sizes), vmax=np.max(sizes))
-
     return parts_cmap(norm(sizes))
 
 
 def velocity(vtk):
     return np.sqrt(
         0
-        # + vtk.data["PART_VX1"] ** 2
-        # + vtk.data["PART_VX2"] ** 2
+        + vtk.data["PART_VX1"] ** 2
+        + vtk.data["PART_VX2"] ** 2
         + vtk.data["PART_VX3"] ** 2
     )
 
@@ -177,12 +174,13 @@ quantities2 = [
     PartQuantity(
         "evn",
         uids=uids,
-        title="Azimuthal velocity",
+        # title="Velocity divided by escape velocity",
         plot_coords=[0, 0],
         yscale="log",
         compute=normalized_velocity,
         xlabel="$t$ [yr]",
-        ylabel=r"$v_\phi/v_\mathrm{esc}$",
+        ylabel=r"$v/v_\mathrm{esc}$",
+        symbol=r"$v/v_\mathrm{esc}$",
         customize=cb,
     ),
 ]

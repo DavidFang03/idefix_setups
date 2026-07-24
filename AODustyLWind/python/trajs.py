@@ -12,30 +12,63 @@ from matplotlib.transforms import Affine2D
 import mpl_toolkits.mplot3d.art3d as art3d
 
 plt.style.use("dark_background")
-def size(betas):
+
+parts_cmap = plt.get_cmap("cool")
+
+def float_to_latex(num: float) -> str:
+    """
+    Converts a float (including scientific notation like 4e3)
+    into a LaTeX formatted string: $4 \cdot 10^3$.
+    """
+    if num == 0:
+        return "0"
+
+    # Get the base-10 exponent and the mantissa
+    exponent = int(np.floor(np.log10(abs(num))))
+    mantissa = num / (10**exponent)
+
+    # Clean up trailing zeros or convert float integers (like 4.0 to 4)
+    mantissa = int(mantissa) if mantissa.is_integer() else round(mantissa, 4)
+
+    # If the mantissa is exactly 1, we usually just write 10^x instead of 1 \cdot 10^x
+    if mantissa == 1:
+        return f"10^{{{exponent}}}"
+    if mantissa == -1:
+        return f"-10^{{{exponent}}}"
+
+    # Format as a LaTeX inline np string
+    return f"{mantissa:.2} \\cdot 10^{{{exponent}}}"
+
+def colors(vtk):
+    sizes = size(vtk)
+    norm = LogNorm(vmin=np.min(sizes), vmax=np.max(sizes))
+
+    return parts_cmap(norm(sizes))
+
+def size(v):
+    beta = v.data["DRAGCOEFF"]
     rho0 = 6.0e-10
     rhos = 1.0
     au = 1.5e11
-    return betas * (rho0 * au) / rhos
-
+    return beta * (rho0 * au) / rhos
 
 iniPath = Path(
-    "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/inputs_v2/dw100_v3_thin_tv_b1e4_2000p.ini"
+    "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/inputs_v2/dw100_v2_thin_b1e4_2000p.ini"
 )
 with iniPath.open("rb") as fh:
     inidata = inifix.load(fh, sections="require")
 
-frequency = 3
+frequency = 1
 datas_vtk = sorted(
     glob.glob(
-        "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/outputs_v2/dw100_v3_thin_tv_b1e4_2000p/vtks/data*vtk"
-    )[::frequency]
-)
+        "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/outputs_v2/dw100_v2_thin_b1e4_2000p/vtks/data*vtk"
+    )
+)[::frequency]
 parts_vtk = sorted(
     glob.glob(
-        "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/outputs_v2/dw100_v3_thin_tv_b1e4_2000p/vtks/part*vtk"
-    )[::frequency]
-)
+        "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/outputs_v2/dw100_v2_thin_b1e4_2000p/vtks/part*vtk"
+    )
+)[::frequency]
 
 num_r = int(inidata["Particles"]["num_r"][0])
 num_theta = int(inidata["Particles"]["num_theta"][0])
@@ -50,9 +83,8 @@ uids = list(same_pos)
 
 
 def extract_particle_trajectory(parts_vtk_paths, target_uid):
-    """Extracts the time-series Cartesian coordinates and azimuthal angle (phi)
-
-    for a single target particle UID across a list of particle VTK files.
+    """Extracts time-series data: Cartesian coordinates, phi, t
+    for one single UID.
 
     Parameters:
     -----------
@@ -63,17 +95,14 @@ def extract_particle_trajectory(parts_vtk_paths, target_uid):
 
     Returns:
     --------
-    px, py, pz : ndarray
-        1D arrays of the particle's X, Y, and Z positions over time.
-    pphi : ndarray
-        1D array of the particle's azimuthal angle (phi) in radians over time.
+    px, py, pz, pphi, t : ndarray
     """
-    px, py, pz = [], [], []
+    px, py, pz, t = [], [], [], []
 
     for file_path in parts_vtk_paths:
         pv = readVTK(file_path)
         uids_array = np.array(pv.data["uid"])
-
+        t.append(pv.t[0])
         if target_uid in uids_array:
             idx = np.where(uids_array == target_uid)[0][0]
             # Pull keys directly from particle dictionary
@@ -97,13 +126,13 @@ def extract_particle_trajectory(parts_vtk_paths, target_uid):
     py = np.array(py)
     pz = np.array(pz)
     pphi = np.arctan2(py, px)
+    t = np.array(t)
 
-    return px, py, pz, pphi
+    return px, py, pz, pphi, t
 
 
 def extract_gas_slice(data_vtk_path):
     """Extracts the underlying 2D cylindrical grid mesh (R, Z) and the
-
     2D density (RHO) field slice from a single fluid VTK snapshot.
 
     Parameters:
@@ -113,12 +142,7 @@ def extract_gas_slice(data_vtk_path):
 
     Returns:
     --------
-    R : ndarray
-        2D meshgrid matrix for radial coordinates.
-    Z : ndarray
-        2D meshgrid matrix for vertical coordinates.
-    rho_slice : ndarray
-        2D matrix containing the RHO field values at the sliced plane.
+    R, Z, rho_slice : ndarray
     """
     dv = readVTK(data_vtk_path)
 
@@ -138,21 +162,21 @@ def extract_gas_slice(data_vtk_path):
 
 
 dv_initial = readVTK(datas_vtk[0])
+pv_initial = readVTK(parts_vtk[0])
 R, Theta = np.meshgrid(dv_initial.r, dv_initial.theta)
 
+uid = uids[0]
+c = colors(pv_initial)[uid]
+s = size(pv_initial)[uid]
 # Simple, direct definitions mapping to your physical dimensions
 X = R * np.sin(Theta)
 Z = R * np.cos(Theta)
-px, py, pz, pphi = extract_particle_trajectory(parts_vtk, uids[0])
+# px, py, pz, pphi, t = extract_particle_trajectory(parts_vtk, uid)
 fig, axs = plt.subplots()
 # axs.plot(px, pz)
 axs.pcolormesh(X, Z, extract_gas_slice(datas_vtk[0])[2])
 # fig.savefig("test.png")
 
-
-# -------------------------------------------------------------------
-# 3. Animation Engine
-# -------------------------------------------------------------------
 
 
 def render_particle_and_gas_slice(
@@ -178,10 +202,10 @@ def render_particle_and_gas_slice(
     trail_line, head_point = None, None
     if not disable_trajectory:
         (trail_line,) = ax.plot(
-            [], [], [], color="red", linewidth=2, label="Particle Trajectory", zorder=5
+            [], [], [], color=c, linewidth=2, label=f"$s={float_to_latex(s)} \\,\\mathrm{{m}}$", zorder=5
         )
         (head_point,) = ax.plot(
-            [], [], [], color="red", marker="o", markersize=6, zorder=6
+            [], [], [], color=c, marker="o", markersize=6, zorder=6
         )
 
     # Container to clear old surfaces frame-by-frame
@@ -249,6 +273,9 @@ def render_particle_and_gas_slice(
             head_point.set_data([px[frame]], [py[frame]])
             head_point.set_3d_properties([pz[frame]])
             artists.extend([trail_line, head_point])
+        
+        ax.set_title(f"${float_to_latex(t[frame])}$ yr")
+
 
         return artists
 
@@ -270,14 +297,10 @@ def render_particle_and_gas_slice(
     )
 
     print("Writing rendering engine outputs to disk...")
-    ani.save(save_path, writer="ffmpeg", fps=20, dpi=150)
+    ani.save(save_path, writer="ffmpeg", fps=60/frequency, dpi=150)
     plt.close(fig)
     print(f"Done! Saved file to {save_path}")
 
-
-# -------------------------------------------------------------------
-# 2. Main Controller Execution Blueprint
-# -------------------------------------------------------------------
 
 if __name__ == "__main__":
     target_particle_uid = uids[0]
@@ -288,7 +311,7 @@ if __name__ == "__main__":
     # ------------------------------------
 
     # 1. Trajectory Data
-    px, py, pz, pphi = extract_particle_trajectory(parts_vtk, target_particle_uid)
+    px, py, pz, pphi, t = extract_particle_trajectory(parts_vtk, target_particle_uid)
 
     # 2. Grid & Gas Data
     dv_initial = readVTK(datas_vtk[0])

@@ -21,14 +21,14 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind"
 configPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/config.json"
 beta = "1e4"
-task = f"dw100_v2_thin_b{beta}_2000p"
+task = f"dw100_v2_thin_tv_b{beta}_2000p"
 
 runContext = RunContext(
     task,
     projectPath,
     configPath=configPath,
-    dataFolder=f"{projectPath}/outputs_v2/{task}/vtks",
-    iniPath=f"{projectPath}/inputs_v2/{task}.ini",
+    dataFolder=f"{projectPath}/outputs_v3/{task}/vtks",
+    iniPath=f"{projectPath}/inputs_v3/{task}.ini",
     custom_name=task,
     # pdf_mode=True,
 )
@@ -52,14 +52,13 @@ num_size = int(runContext.inidata["Particles"]["num_size"][0])
 uids_grid = np.arange(num_r * num_theta * num_size).reshape(num_r, num_theta, num_size)
 print(uids_grid.shape)
 
-same_r = uids_grid[-2, :, :].flatten()
-same_angle = uids_grid[:, 3, :].flatten()
-same_size = uids_grid[:, :, ::2].flatten()
+same_r = uids_grid[-3, :, :].flatten()
+same_angle = uids_grid[:, -1, :].flatten()
 
 # same_pos = [uid for uid in same_r if uid in same_angle and uid in same_size]
 same_pos = [uid for uid in same_r if uid in same_angle]
 uids = list(same_pos)
-uids = "all"
+# uids = "all"
 
 print("uids", uids)
 Hideal = float(runContext.inidata["Setup"]["Hideal"])
@@ -107,14 +106,15 @@ cbformat.set_powerlimits((-2, 12))
 cbformat.set_useMathText(True)
 
 
-def colorbar(mappable, loc):
-    last_axes = plt.gca()
+def colorbar(mappable, loc, **kwargs):
+    # last_axes = plt.gca()
     ax = mappable.axes
     fig = ax.figure
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes(loc, size="4%", pad="25%")
-    cbar = fig.colorbar(mappable, cax=cax, location=loc, pad="-100%")
-    plt.sca(last_axes)
+    # divider = make_axes_locatable(ax)
+    # cax = divider.append_axes(loc, size="4%", pad="25%")
+    cbar = fig.colorbar(mappable, ax=ax, location=loc, **kwargs)
+    # cbar = fig.colorbar(mappable, cax=cax, location=loc, pad="1000%")
+    # plt.sca(last_axes)
     return cbar
 
 
@@ -128,8 +128,8 @@ def cb(ax, vtk):
     mappable.axes = ax
     # fig = ax.figure
     # cbar = fig.colorbar(mappable, pad=0.05, location="left")
-    cbar = colorbar(mappable, loc="left")
-    cbar.ax.set_title("Dust size [m]", pad=15)
+    cbar = colorbar(mappable, loc="right")
+    cbar.ax.set_title("Dust size [m]", y=1.05)
 
     # 4. For log scales, you need log locators so the ticks land on decades
     cbar.ax.yaxis.set_major_locator(matplotlib.ticker.LogLocator(base=10.0))
@@ -189,8 +189,8 @@ quantities = [
         streamlines=["VX1", "VX2"],
         # uids="all",
         uids=uids,
-        plot_kwargs={"alpha": 0.7},
-        # customize=cb,
+        # style_kwargs={"alpha": 0.7},
+        customize=cb,
         # customize=frame,
     ),
     # PartQuantity(
@@ -222,7 +222,7 @@ pipeline = Pipeline(
     runContext,
     [fig1],
     zoom=zoom,
-    scatter_particles=True,
+    # scatter_particles=True,
 )
 
 pipeline.run()

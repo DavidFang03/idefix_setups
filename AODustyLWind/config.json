@@ -63,11 +63,20 @@
         "style_kwargs": {
             "cmap": "inferno"
         },
-        "symbol": "$\\rho$",
+        "symbol": "$\\rho/\\rho_0$",
         "title": "Gas Density"
     },
     "Mach_p": {
-        "symbol": "$\\mathcal{M}_p$",
+        "bounds": [
+            0.1,
+            20
+        ],
+        "style_kwargs": {
+            "cmap": "cool"
+        },
+        "norm": "log"
+    },
+    "Mach_A": {
         "bounds": [
             0.1,
             20

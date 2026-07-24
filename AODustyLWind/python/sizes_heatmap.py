@@ -80,7 +80,8 @@ def get_treshold_size(vtk, uids):
     vtkuids = vtk.data["uid"]
     for ii in range(len(vtkuids)):
         if vtkuids[ii] in uids:
-            sizes.append(vtk.data["SIZE"][ii])
+            # sizes.append(vtk.data["TSTOP"][ii])
+            sizes.append(vtk.data["TSTOP"][ii]*vtk.data["PART_X1"][ii]**(-1.5))
             angles.append(vtk.data["angle"][ii])
 
     iis = np.argsort(np.abs(angles - corona_angle))
@@ -170,8 +171,9 @@ for beta in betas:
     )
 
     vtk = readVTK(paths[-1])
-    firstvtk = readVTK(paths[0])
+    firstvtk = readVTK(paths[1])
     vtk.data["PART_X2"] = vtk.theta
+    vtk.data["PART_X1"] = vtk.r
     vtk.data["SIZE"] = SIZE(vtk)
     vtk.data["angle"] = angle(vtk)
 
@@ -237,7 +239,7 @@ for beta in betas:
         ax.legend(loc="upper left")
 
     cbar = colorbar(mesh2)
-    cbar.set_label(r"$s_\mathrm{crit}$ [m]")
+    cbar.set_label(r"$\mathrm{St}_\mathrm{crit}$ [m]")
 
     axes[0, 0].set_xlabel(r"$x$ [au]")
     fig.suptitle(rf"$\beta_\mathrm{{mid}} = {float_to_latex(float(beta))}$", y=0.8)

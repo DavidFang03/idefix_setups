@@ -722,8 +722,7 @@ void Setup::InitFlow(DataBlock &data) {
   real rho0 = 6.0e-10;
   real rhos = 1.0; // 1 g/cm3
   real au = 1.5e11;
-  // real sizemin = 0.1e-6;  // RD: 0.1 µm - 10µm
-  // real sizemax = 10.0e-6; // RD: 0.1 µm - 10µm
+
   real betamin = rhos * sizemin / (rho0 * au);
   real betamax = rhos * sizemax / (rho0 * au);
 
@@ -745,8 +744,8 @@ void Setup::InitFlow(DataBlock &data) {
   // Many particles
   // default state
   for (int n = 0; n < ntot; n++) {
-    d.Ps(PX1, n) = 0.0;
-    d.Ps(PX2, n) = 0.0;
+    d.Ps(PX1, n) = 10.0;
+    d.Ps(PX2, n) = 1.0;
     d.Ps(PX3, n) = 0;
     d.Ps(PVX1, n) = 0.0;
     d.Ps(PVX2, n) = 0.0;
@@ -792,11 +791,12 @@ void Setup::InitFlow(DataBlock &data) {
                 real vr;
                 real vtheta;
                 real vphi;
+                real cs = sqrt(d.Vc(PRS, k, j, i) / d.Vc(RHO, k, j, i));
+
+                real tstop = beta / (d.Vc(RHO, k, j, i) * cs);
 
                 if (initialvelocity == "tv") {
-                  real cs = sqrt(d.Vc(PRS, k, j, i) / d.Vc(RHO, k, j, i));
-                  real tstop = beta / (d.Vc(RHO, k, j, i) * cs);
-                  real delta = tstop * (pow(d.Vc(VX2, k, j, i), 2) / r - 1.0 / (r * r));
+                  real delta = tstop * (pow(d.Vc(VX2, k, j, i), 2) / r - 1.0 / pow(r, 2));
                   vr = d.Vc(VX1, k, j, i) + delta;
                   vtheta = d.Vc(VX2, k, j, i);
                   vphi = d.Vc(VX3, k, j, i);
@@ -812,12 +812,13 @@ void Setup::InitFlow(DataBlock &data) {
 
                 d.Ps(PX1, n) = r;
                 d.Ps(PX2, n) = theta;
-                d.Ps(PX3, n) = 0;
+                d.Ps(PX3, n) = 0.0;
                 d.Ps(PVX1, n) = vr;
                 d.Ps(PVX2, n) = vtheta;
-                d.Ps(PVX3, n) = vphi; // cylindrical radius
-                d.Ps(PMASS, n) = 1e-10;
+                d.Ps(PVX3, n) = vphi;
+                d.Ps(PMASS, n) = 1.0e-10;
                 d.Ps(DRAGCOEFF, n) = beta;
+                d.Ps(TSTOP, n) = tstop;
                 // }
               }
             }

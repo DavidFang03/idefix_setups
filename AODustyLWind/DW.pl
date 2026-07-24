@@ -19,14 +19,14 @@ sub format_time
     return %time;
 }
 
-my $minutes         = 960;
+my $minutes         = 2048;
 my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
 my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/Lidefix";                            # The directory where calculations are run
 my $folder_name     = "AODustyLWind";
 my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
-my $indir           = $folder_path."inputs_v2/";
+my $indir           = $folder_path."inputs_v3/";
 my $time            = $time_results{slurm};
 my $qos             = "standard";
 my $nodes           = "1";
@@ -35,7 +35,7 @@ my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."reload_l";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec $gpus 1";
-my $name            = "dw100_v3_thin_tv";
+my $name            = "dw100_v2_thin_tv";
 
 # my @sizes = ("1e-5");
 my @betas = ("1e3", "4e3", "7e3", "1e4", "4e4", "6e4", "8e4","1e5");
@@ -48,7 +48,7 @@ print $index."\n";
 my $beta = $betas[$index];
 my $reload_path = "/home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/outputs/clean_wind_100_v2_b".$beta."/dump.0012.dmp";
 my $stringdx_1 = $name."_b".$beta."_2000p"; #OW_test
-my $outputs_path_1 = $folder_path."outputs_v2/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
+my $outputs_path_1 = $folder_path."outputs_v3/".$stringdx_1; #"/home/dp316/dp316/dc-fang1/IdefixRuns/outputs/OW_test
 my $vtksdir1 = $outputs_path_1."/vtks"; #IdefixRuns/outputs/OW_test/vtks
 `mkdir -p $vtksdir1`;
 
@@ -172,7 +172,7 @@ export OMP_PLACES=cores
 srun --nodes=$nodes --ntasks-per-node=$ntasks_per_node \\
      --hint=nomultithread  --distribution=block:block \\
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \\
-     $IDEFIX_EXE $options -i $inifile -restart
+     $IDEFIX_EXE $options -i $inifile
 ENDOFSCRIPT
 `chmod u+x $script`;
 close SCRIPT;
