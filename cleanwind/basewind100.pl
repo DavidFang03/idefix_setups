@@ -19,8 +19,8 @@ sub format_time
     return %time;
 }
 
-my $minutes         = 2400;
-my $gpus            = 4;
+my $minutes         = 240;
+my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
 my $IDEFIX_DIR      = "/home/dp316/dp316/dc-fang1/Lidefix";                            # The directory where calculations are run
@@ -28,19 +28,19 @@ my $folder_name     = "cleanwind";
 my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
-my $qos             = "standard";
+my $qos             = "dev";
 my $nodes           = "1";
 my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
-my $options         = "-dec 4 1";
-my $name            = "hr_wind";
+my $options         = "-dec ".$gpus." 1";
+my $name            = "lr_wind_v2";
 
 my @betas = ("1e3", "4e3", "7e3", "1e4", "4e4", "6e4", "8e4","1e5");
-# my @indexes = (3);
+my @indexes = (3);
 # my @indexes = (0,3,7);
-my @indexes = (0,1,2,3,4,5,6,7);
+# my @indexes = (0,1,2,3,4,5,6,7);
 
 for my $index (@indexes) {
 print $index."\n";
@@ -59,9 +59,8 @@ open INI, ">$inifile";
 print INI <<ENDOFINI;
 ##
 [Grid]
-X1-grid    1  1.0  1024  l   100.0
-X2-grid    3  0.0  512   u  1.28   256  u  1.861592653589  512  u  3.141592653589793
-# X2-grid    1  0.0  1024  u  3.141592653589793
+X1-grid    1  1.0  128  l   100.0
+X2-grid    3  0.0  64   u  1.28   64  u  1.861592653589  64  u  3.141592653589793
 
 [TimeIntegrator]
 CFL            0.9
@@ -129,8 +128,8 @@ print SCRIPT <<ENDOFSCRIPT;
 # Request right number of full nodes (48 cores by node for A100-80 GPU nodes))
 #SBATCH --nodes=$nodes
 #SBATCH --ntasks-per-node=$ntasks_per_node
-#SBATCH --gres=$gres
 #SBATCH --cpus-per-task=1
+#SBATCH --gres=$gres
 
 #SBATCH --account=dp316
 

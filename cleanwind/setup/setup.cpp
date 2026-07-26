@@ -261,7 +261,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 
           // Vc(VX3,k,j,i) = 1.0/sqrt(Rmin) * sqrt( Rmin / sqrt(Rmin*Rmin + z*z));
           Vc(VX3, k, j, i) = Omega * R;
-          Vc(BX3, k, j, i) = Vc(BX3, k, j, 2 * ighost - i - 1);
+          Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i - 1);
           // Vc(BX3,k,j,i) = Vc(BX3,k,j,ighost);
         });
     hydro->boundary->BoundaryForX2s("UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
@@ -274,9 +274,6 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
     IdefixArray1D<real> x2 = data->x[JDIR];
 
     int ighost = data->end[IDIR] - 1;
-    real Rin = 1.0;
-    real csdisk = epsilonGlob / sqrt(Rin);
-    real cscorona = epsilonTopGlob / sqrt(Rin);
 
     hydro->boundary->BoundaryFor(
         "UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
@@ -295,7 +292,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 
           // Vc(VX3,k,j,i) = 1.0/sqrt(Rmin) * sqrt( Rmin / sqrt(Rmin*Rmin + z*z));
           Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
-          Vc(BX3, k, j, i) = Vc(BX3, k, j, 2 * ighost - i - 1);
+          Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i - 1);
           // Vc(BX3,k,j,i) = Vc(BX3,k,j,ighost);
         });
     hydro->boundary->BoundaryForX2s("UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
@@ -332,7 +329,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
             Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
             Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
-            Vc(BX3, k, j, i) = 0.0;
+            Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i);
           });
 
       hydro->boundary->BoundaryForX1s(
