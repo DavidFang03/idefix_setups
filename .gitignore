@@ -22,6 +22,7 @@ Idefix2Python/
 *.npy
 *.ipynb
 *.pdf
+*.pyc
 .env
 !AODustyLWind/reload_l/clean_wind.0002.dmp
 !AODustyLWind/reload_l/clean_wind_100.0001.dmp

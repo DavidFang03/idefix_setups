@@ -1,6 +1,7 @@
 from idefix2python import RunContext, Pipeline, MapMovie2D, Fig
 import numpy as np
 import matplotlib
+from common import WindyDisk
 
 matplotlib.use("pdf")
 
@@ -8,7 +9,8 @@ projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind"
 # projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind"
 configPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/config.json"
 # task = "cw_20_b1e4"
-task = "clean_wind_100_v2_b1e4"
+# task = "clean_wind_100_v2_b1e4"
+task = "lr_wind_v9_b1e4"
 runContext = RunContext(
     task,
     projectPath,
@@ -18,6 +20,7 @@ runContext = RunContext(
 
 eps = 0.05
 betamid = float(runContext.inidata["Setup"]["beta"])
+wd = WindyDisk(runContext.inidata, runContext.gridInfo)
 
 
 def float_to_latex(num: float) -> str:
@@ -65,11 +68,14 @@ quantities = [
         plot_coords=[0, 0],
         streamlines=["VX1", "VX2"],
         customize=title,
-        streamline_kwargs={
-            "color": (0.6, 0.6, 0.6, 0.9),
-            "density": 1,
-            "linewidth": 1,
-        },
+        # xmax=10,
+        # ymin=-10,
+        # ymax=10,
+        # streamline_kwargs={
+        #     "color": (0.6, 0.6, 0.6, 0.9),
+        #     "density": 1,
+        #     "linewidth": 1,
+        # },
     ),
     MapMovie2D(
         "beta",
@@ -80,11 +86,20 @@ quantities = [
         compute=plasmabeta,
         bounds=[1, betamid],
         norm="log",
-        streamline_kwargs={
-            "color": (0.6, 0.6, 0.6, 0.9),
-            "density": 1,
-            "linewidth": 1,
-        },
+        # streamline_kwargs={
+        #     "color": (0.6, 0.6, 0.6, 0.9),
+        #     "density": 1,
+        #     "linewidth": 1,
+        # },
+    ),
+    MapMovie2D(
+        "vz",
+        r"$v_z$",
+        plot_coords=[0, 2],
+        streamlines=["VX1", "VX2"],
+        compute=wd.vz,
+        bounds=[-1e-5, 1e-5],
+        style_kwargs={"cmap": "coolwarm"},
     ),
 ]
 fig1 = Fig(quantities)
