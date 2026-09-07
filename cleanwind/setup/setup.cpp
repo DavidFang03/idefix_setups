@@ -52,15 +52,16 @@ MyGlobalClass *myGlobals;
 
 void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
 
+#ifndef DISABLE_MHD
   // Use Invdt as scratch array
   IdefixArray3D<real> scrh("Scratch", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
   IdefixArray3D<real> scrh_eta("Scratch_eta", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
-
-  IdefixArray3D<real> array1 = myGlobals->array1;
-
   // Ask for a computation of xA ambipolar in this scratch array
   Wind::Resistivity(data, data.t, scrh_eta);
   Wind::Ambipolar(data, data.t, scrh);
+#endif
+
+  IdefixArray3D<real> array1 = myGlobals->array1;
 
   // Mirror data on Host
   DataBlockHost d(data);
@@ -71,10 +72,16 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   // Make references to the user-defined arrays (variables is a container of
   // IdefixHostArray3D) Note that the labels should match the variable names in
   // the input file
+#ifndef DISABLE_MHD
   IdefixHostArray3D<real> eta = variables["eta"];
   IdefixHostArray3D<real> Am = variables["Am"];
-  IdefixHostArray3D<real> InvDt = variables["InvDt"];
   IdefixHostArray3D<real> EPhi = variables["Ephi"];
+  IdefixArray3D<real>::HostMirror scrhHost = Kokkos::create_mirror_view(scrh);
+  Kokkos::deep_copy(scrhHost, scrh);
+  IdefixArray3D<real>::HostMirror scrhHost_eta = Kokkos::create_mirror_view(scrh_eta);
+  Kokkos::deep_copy(scrhHost_eta, scrh_eta);
+#endif
+  IdefixHostArray3D<real> InvDt = variables["InvDt"];
   IdefixHostArray3D<real> addedMass = variables["addedMass"];
   // IdefixHostArray1D<real> vpsi = variables["vpsi"];
 
@@ -83,10 +90,7 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   IdefixHostArray1D<real> x1 = d.x[IDIR];
   IdefixHostArray1D<real> x2 = d.x[JDIR];
   IdefixHostArray4D<real> Vc = d.Vc;
-  IdefixArray3D<real>::HostMirror scrhHost = Kokkos::create_mirror_view(scrh);
-  Kokkos::deep_copy(scrhHost, scrh);
-  IdefixArray3D<real>::HostMirror scrhHost_eta = Kokkos::create_mirror_view(scrh_eta);
-  Kokkos::deep_copy(scrhHost_eta, scrh_eta);
+
   IdefixArray3D<real>::HostMirror scrhHost_addedMass = Kokkos::create_mirror_view(array1);
 
   for (int k = d.beg[KDIR]; k < d.end[KDIR]; k++) {
@@ -95,10 +99,12 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
         real z = x1(i) * cos(x2(j));
         real R = FMAX(FABS(x1(i) * sin(x2(j))), ONE_F);
         real Omega = pow(R, -1.5);
+#ifndef DISABLE_MHD
         eta(k, j, i) = scrhHost_eta(k, j, i);
         Am(k, j, i) = 1.0 / (Omega * scrhHost(k, j, i) * Vc(RHO, k, j, i));
-        InvDt(k, j, i) = d.InvDt(k, j, i);
         EPhi(k, j, i) = d.Ex3(k, j, i);
+#endif
+        InvDt(k, j, i) = d.InvDt(k, j, i);
         addedMass(k, j, i) = scrhHost_addedMass(k, j, i);
         // vpsi(k, j, i) = vpsi(k, j, i);
       }
@@ -111,11 +117,15 @@ void AnalysisFunction(DataBlock &data) { analysis->PerformAnalysis(data); }
 void InternalBoundary(Hydro *hydro, const real t) {
   auto *data = hydro->data;
   IdefixArray4D<real> Vc = hydro->Vc;
-  IdefixArray4D<real> Vs = hydro->Vs;
   IdefixArray1D<real> x1 = data->x[IDIR];
   IdefixArray1D<real> x2 = data->x[JDIR];
 
+#ifndef DISABLE_MHD
+  IdefixArray4D<real> Vs = hydro->Vs;
+
   real vAmax = Wind::computeVaMax(4.0, 50.0, 8.0, t);
+#endif
+
   real densityFloor0 = densityFloorGlob;
   real Rin = 1.0;
   real epsilon = epsilonGlob;
@@ -126,8 +136,9 @@ void InternalBoundary(Hydro *hydro, const real t) {
       "InternalBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
         real R = x1(i) * sin(x2(j));
         real z = x1(i) * cos(x2(j));
-        // real zh = FABS(z / R) / epsilon;
+    // real zh = FABS(z / R) / epsilon;
 
+#ifndef DISABLE_MHD
         real b2 = EXPAND(Vc(BX1, k, j, i) * Vc(BX1, k, j, i), +Vc(BX2, k, j, i) * Vc(BX2, k, j, i), +Vc(BX3, k, j, i) * Vc(BX3, k, j, i));
         real va2 = b2 / Vc(RHO, k, j, i);
         real myMax = vAmax;
@@ -137,11 +148,12 @@ void InternalBoundary(Hydro *hydro, const real t) {
           Vc(RHO, k, j, i) = b2 / (myMax * myMax);
           Vc(PRS, k, j, i) = T * Vc(RHO, k, j, i);
         }
+#endif
+
         real densityFloor = Wind::computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
         if (Vc(RHO, k, j, i) < densityFloor) {
           array1(k, j, i) = array1(k, j, i) + densityFloor - Vc(RHO, k, j, i);
 
-          real T = Vc(PRS, k, j, i) / Vc(RHO, k, j, i);
           Vc(RHO, k, j, i) = densityFloor;
         }
       });
@@ -153,12 +165,14 @@ void InternalBoundary(Hydro *hydro, const real t) {
 Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   // Set the function for userdefboundary
   data.hydro->EnrollUserDefBoundary(&Wind::UserdefBoundary);
-  data.hydro->EnrollAmbipolarDiffusivity(&Wind::Ambipolar);
-  data.hydro->EnrollOhmicDiffusivity(&Wind::Resistivity);
   data.hydro->EnrollUserSourceTerm(&Wind::MySourceTerm);
   data.hydro->EnrollInternalBoundary(&InternalBoundary);
-  data.hydro->EnrollEmfBoundary(&Wind::EmfBoundary);
 
+#ifndef DISABLE_MHD
+  data.hydro->EnrollAmbipolarDiffusivity(&Wind::Ambipolar);
+  data.hydro->EnrollOhmicDiffusivity(&Wind::Resistivity);
+  data.hydro->EnrollEmfBoundary(&Wind::EmfBoundary);
+#endif
   output.EnrollUserDefVariables(&ComputeUserVars);
 
   myGlobals = new MyGlobalClass(data);
@@ -195,11 +209,11 @@ void Setup::InitFlow(DataBlock &data) {
   DataBlockHost d(data);
 
   // Make vector potential
+#ifndef DISABLE_MHD
   IdefixHostArray4D<real> A = IdefixHostArray4D<real>("Setup_VectorPotential", 3, data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
+#endif
 
   real Rin = 1.0;
-  real m = -5.0 / 4.0;
-  real B0 = epsilonGlob * sqrt(2.0 / betaGlob);
 
   for (int k = 0; k < d.np_tot[KDIR]; k++) {
     for (int j = 0; j < d.np_tot[JDIR]; j++) {
@@ -208,29 +222,42 @@ void Setup::InitFlow(DataBlock &data) {
         real th = d.x[JDIR](j);
         real z = r * cos(th);
         real R = r * sin(th);
-        if (R > Rin) {
-          real Zh = FABS(z / R) / epsilonGlob;
-          real csdisk = epsilonGlob / sqrt(R);
-          real cs2 = csdisk * csdisk;
-          d.Vc(RHO, k, j, i) = 1.0 / (R * sqrt(R)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(R * R + z * z) - 1.0 / R));
-          d.Vc(VX3, k, j, i) = 1.0 / sqrt(R) * sqrt(FMAX(R / sqrt(R * R + z * z) - 2.5 * csdisk * csdisk, 0.0));
-          d.Vc(PRS, k, j, i) = cs2 * d.Vc(RHO, k, j, i);
-          if (std::isnan(d.Vc(VX3, k, j, i))) {
-            idfx::cout << "Nan in R>Rin at (i,j,k)=(" << i << "," << j << "," << k << "), (r,th,R,z)=(" << r << "," << th << "," << R << "," << z << ")" << std::endl;
-            IDEFIX_ERROR("Nan!s");
-          }
-        } else {
-          real Zh = FABS(z / Rin) / epsilonGlob;
-          real csdisk = epsilonGlob / sqrt(Rin);
-          real cs2 = csdisk * csdisk;
-          d.Vc(RHO, k, j, i) = 1.0 / (Rin * sqrt(Rin)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(Rin * Rin + z * z) - 1.0 / Rin));
-          d.Vc(VX3, k, j, i) = 1.0 / sqrt(Rin) * sqrt(FMAX(Rin / sqrt(Rin * Rin + z * z) - 2.5 * csdisk * csdisk, 0.0));
-          d.Vc(PRS, k, j, i) = cs2 * d.Vc(RHO, k, j, i);
-          if (std::isnan(d.Vc(VX3, k, j, i))) {
-            idfx::cout << "Nan in R<Rin at (i,j,k)=(" << i << "," << j << "," << k << "), (r,th,R,z)=(" << r << "," << th << "," << R << "," << z << ")" << std::endl;
-            IDEFIX_ERROR("Nan!s");
-          }
-        }
+
+        real Rmin = FMAX(R, Rin);
+        real Zh = FABS(z / Rmin) / epsilonGlob;
+        real csdisk = epsilonGlob / sqrt(Rmin);
+        real temp = Wind::temperature(r, th, epsilonGlob, epsilonTopGlob, Rin, HidealGlob, trSmoothingTempGlob);
+        real cs2 = csdisk * csdisk;
+        // real cs2 = temp;
+
+        d.Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(1.0 / cs2 * (1.0 / r - 1.0 / Rmin));
+        d.Vc(VX3, k, j, i) = 1.0 / sqrt(Rmin) * sqrt(FMAX(Rmin / r - 2.5 * epsilonGlob * epsilonGlob, 1.0));
+        // d.Vc(PRS, k, j, i) = cs2 * d.Vc(RHO, k, j, i);
+        d.Vc(PRS, k, j, i) = temp * d.Vc(RHO, k, j, i);
+
+        // if (R > Rin) {
+        //   real Zh = FABS(z / R) / epsilonGlob;
+        //   real csdisk = epsilonGlob / sqrt(R);
+        //   real cs2 = csdisk * csdisk;
+        //   d.Vc(RHO, k, j, i) = 1.0 / (R * sqrt(R)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(R * R + z * z) - 1.0 / R));
+        //   d.Vc(VX3, k, j, i) = 1.0 / sqrt(R) * sqrt(FMAX(R / sqrt(R * R + z * z) - 2.5 * csdisk * csdisk, 0.0));
+        //   d.Vc(PRS, k, j, i) = cs2 * d.Vc(RHO, k, j, i);
+        //   if (std::isnan(d.Vc(VX3, k, j, i))) {
+        //     idfx::cout << "Nan in R>Rin at (i,j,k)=(" << i << "," << j << "," << k << "), (r,th,R,z)=(" << r << "," << th << "," << R << "," << z << ")" << std::endl;
+        //     IDEFIX_ERROR("Nan!s");
+        //   }
+        // } else {
+        //   real Zh = FABS(z / Rin) / epsilonGlob;
+        //   real csdisk = epsilonGlob / sqrt(Rin);
+        //   real cs2 = csdisk * csdisk;
+        //   d.Vc(RHO, k, j, i) = 1.0 / (Rin * sqrt(Rin)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(Rin * Rin + z * z) - 1.0 / Rin));
+        //   d.Vc(VX3, k, j, i) = 1.0 / sqrt(Rin) * sqrt(FMAX(Rin / sqrt(Rin * Rin + z * z) - 2.5 * csdisk * csdisk, 0.0));
+        //   d.Vc(PRS, k, j, i) = cs2 * d.Vc(RHO, k, j, i);
+        //   if (std::isnan(d.Vc(VX3, k, j, i))) {
+        //     idfx::cout << "Nan in R<Rin at (i,j,k)=(" << i << "," << j << "," << k << "), (r,th,R,z)=(" << r << "," << th << "," << R << "," << z << ")" << std::endl;
+        //     IDEFIX_ERROR("Nan!s");
+        //   }
+        // }
 
         d.Vc(VX1, k, j, i) = ZERO_F;
         d.Vc(VX2, k, j, i) = ZERO_F;
@@ -238,28 +265,24 @@ void Setup::InitFlow(DataBlock &data) {
         real densityFloor = Wind::computeDensityFloor(R, z, densityFloorGlob, Rin, epsilonGlob);
         if (d.Vc(RHO, k, j, i) < densityFloor) {
           d.Vc(RHO, k, j, i) = densityFloor;
-          // d.Vc(PRS,k,j,i) = T2*d.Vc(RHO,k,j,i);
+          d.Vc(PRS, k, j, i) = cs2 * d.Vc(RHO, k, j, i);
         }
 
+#ifndef DISABLE_MHD
         // Vector potential on the corner
+
+        real m = -5.0 / 4.0;
+        real B0 = epsilonGlob * sqrt(2.0 / betaGlob);
         real s = sin(d.xl[JDIR](j));
         R = d.xl[IDIR](i) * s;
 
         A(IDIR, k, j, i) = ZERO_F;
         A(JDIR, k, j, i) = ZERO_F;
 
-#ifdef EVOLVE_VECTOR_POTENTIAL
         if (R > Rin) {
           d.Ve(AX3e, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0) + Rin * Rin / (2.0 * R));
         } else {
           d.Ve(AX3e, k, j, i) = B0 * R / 2.0;
-        }
-#else
-        if (R > Rin) {
-          A(KDIR, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0));
-          A(KDIR, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0) + Rin * Rin / (2.0 * R));
-        } else {
-          A(KDIR, k, j, i) = B0 * R / 2.0;
         }
 #endif
       }
@@ -267,7 +290,7 @@ void Setup::InitFlow(DataBlock &data) {
   }
 
 // Make the field from the vector potential
-#ifndef EVOLVE_VECTOR_POTENTIAL
+#ifndef DISABLE_MHD
   d.MakeVsFromAmag(A);
 #endif
 

@@ -5,8 +5,7 @@
 #include <iomanip>
 #include <iostream>
 
-Analysis::Analysis(Input &input, Grid &grid, DataBlock &data, Output &output,
-                   std::string filename) {
+Analysis::Analysis(Input &input, Grid &grid, DataBlock &data, Output &output, std::string filename) {
   this->d = new DataBlockHost(data);
   this->grid = &grid;
   this->filename = filename;
@@ -47,13 +46,11 @@ double Analysis::Average(const int nfields, int fields[])
   // Reduce
 #ifdef WITH_MPI
   real reducedValue;
-  MPI_Reduce(&outfield, &reducedValue, 1, MPI_DOUBLE, MPI_SUM, 0,
-             MPI_COMM_WORLD);
+  MPI_Reduce(&outfield, &reducedValue, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   outfield = reducedValue;
 #endif
 
-  outfield = outfield / ((double)grid->np_int[IDIR] * grid->np_int[JDIR] *
-                         grid->np_int[KDIR]);
+  outfield = outfield / ((double)grid->np_int[IDIR] * grid->np_int[JDIR] * grid->np_int[KDIR]);
 
   return outfield;
 }
@@ -79,7 +76,6 @@ void Analysis::ResetAnalysis() {
   if (idfx::prank == 0) {
     file.open(filename, std::ios::trunc);
     file << std::setw(col_width) << "t";
-    file << std::setw(col_width) << "divB";
     file << std::setw(col_width) << "mass";
     file << std::endl;
     file.close();
@@ -89,7 +85,7 @@ void Analysis::ResetAnalysis() {
 void Analysis::PerformAnalysis(DataBlock &data) {
   idfx::pushRegion("Analysis::PerformAnalysis");
   d->SyncFromDevice();
-  int fields[3];
+  int fields[2];
   if (idfx::prank == 0) {
     file.open(filename, std::ios::app);
     file.precision(precision);
@@ -100,7 +96,6 @@ void Analysis::PerformAnalysis(DataBlock &data) {
   // const int nz0 = data.beg[KDIR];
 
   WriteField(data.t);
-  WriteField(data.hydro->CheckDivB());
 
   fields[0] = RHO;
   WriteField(Average(1, fields));

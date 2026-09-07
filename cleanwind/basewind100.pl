@@ -19,8 +19,8 @@ sub format_time
     return %time;
 }
 
-# my $minutes         = 60;
-my $minutes         = 2400;
+my $minutes         = 60;
+# my $minutes         = 2400;
 my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
@@ -29,15 +29,15 @@ my $folder_name     = "cleanwind";
 my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
-my $qos             = "standard";
-# my $qos             = "dev";
+# my $qos             = "standard";
+my $qos             = "dev";
 my $nodes           = "1";
 my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus." 1";
-my $name            = "lr_wind_v9";
+my $name            = "lr_wind_v8_MHDOFF";
 
 # my @betas = ("1e3", "4e3", "7e3", "1e4", "4e4", "6e4", "8e4","1e5");
 # my @betas = ("5e5", "1e6", "5e6","1e7");
@@ -71,27 +71,28 @@ print INI <<ENDOFINI;
 # v8 back to VSI?
 # v9 removing axis
 [Grid]
-# X1-grid    1  1.0  168  l   100.0
 X1-grid    1  1.0  168  l   100.0
 X2-grid    3  0.0  128   u  1.28   64  u  1.861592653589  128  u  3.141592653589793
 # X2-grid    3  0.5235987755982988  128   u  1.28   64  u  1.861592653589  128  u  2.6179938779914944
 
 # mr
 # X1-grid    1  1.0  512  l   100.0
+# X2-grid    3  0.0  256   u  1.28   128  u  1.861592653589  256  u  3.141592653589793
 # X2-grid    3  0.5235987755982988  256   u  1.28   128  u  1.861592653589  256  u  2.6179938779914944
 
 [TimeIntegrator]
 CFL            0.9
 tstop          100000.0
-first_dt       1.e-8
+first_dt       1.e-14
 nstages        2
 max_runtime    $idefix_limit
 
 [Hydro]
-solver       hlld
+# solver       hlld
+solver       hll
 ambipolar    explicit  userdef
 resistivity  explicit  userdef
-gamma        1.4
+gamma        1.0001
 
 
 
@@ -109,17 +110,18 @@ X2-end    userdef
 Rm0                    20.0
 etab0                  1.0
 epsilon                0.05
-tau0                   1.0
+tau0                   0.1
 beta                   $beta
 epsilonTop             0.2 # just for temperature: Tcorona/Tdisk = (epsilonTop/epsilon)**2
 Hideal                 5.0 # height of the corona
 Am                     1.0
 densityFloor           1.0e-10
 transitionSmoothing    0.2
-transitionSmoothingTemp    0.2
+transitionSmoothingTemp    1.0
 
 [Output]
-uservar    eta    Am    InvDt   addedMass   Ephi
+uservar    InvDt   addedMass
+# uservar    eta    Am    InvDt   addedMass   Ephi
 vtk        100
 dmp_dir    $outputs_path_1
 dmp        5000

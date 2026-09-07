@@ -10,7 +10,7 @@ projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind"
 configPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/config.json"
 # task = "cw_20_b1e4"
 # task = "clean_wind_100_v2_b1e4"
-task = "lr_wind_v9_b1e4"
+task = "lr_wind_v8_MHDOFF_b1e4"
 runContext = RunContext(
     task,
     projectPath,
@@ -68,29 +68,26 @@ quantities = [
         plot_coords=[0, 0],
         streamlines=["VX1", "VX2"],
         customize=title,
-        # xmax=10,
-        # ymin=-10,
-        # ymax=10,
-        # streamline_kwargs={
-        #     "color": (0.6, 0.6, 0.6, 0.9),
-        #     "density": 1,
-        #     "linewidth": 1,
-        # },
+        style_kwargs={"cmap": "viridis"},
     ),
+    # MapMovie2D(
+    #     "beta",
+    #     r"$\beta$",
+    #     title=r"Plasma $\beta$ (poloidal)",
+    #     plot_coords=[0, 1],
+    #     streamlines=["BX1", "BX2"],
+    #     compute=plasmabeta,
+    #     bounds=[1, betamid],
+    #     norm="log",
+    # ),
     MapMovie2D(
-        "beta",
-        r"$\beta$",
-        title=r"Plasma $\beta$ (poloidal)",
+        "T",
+        r"$T$",
+        title=r"Temperature",
         plot_coords=[0, 1],
-        streamlines=["BX1", "BX2"],
-        compute=plasmabeta,
-        bounds=[1, betamid],
+        streamlines=["VX1", "VX2"],
+        compute=wd.temperature,
         norm="log",
-        # streamline_kwargs={
-        #     "color": (0.6, 0.6, 0.6, 0.9),
-        #     "density": 1,
-        #     "linewidth": 1,
-        # },
     ),
     MapMovie2D(
         "vz",

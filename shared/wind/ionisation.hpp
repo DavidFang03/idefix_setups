@@ -3,8 +3,9 @@
 #include "../../shared/wind/params.hpp"
 
 using namespace Params;
-
 namespace Wind {
+
+#ifndef DISABLE_MHD
 void Ambipolar(DataBlock &data, real t, IdefixArray3D<real> &xAin) {
   IdefixArray3D<real> xA = xAin;
   IdefixArray1D<real> x1 = data.x[IDIR];
@@ -106,12 +107,17 @@ void Resistivity(DataBlock &data, real t, IdefixArray3D<real> &etain) {
         //                EtaBuffer;
       });
 }
+#endif
 
-KOKKOS_INLINE_FUNCTION real temperature(real R, real z, real epsilon, real epsilonTop, real Rin, real Hideal, real trSmoothingTemp) {
+KOKKOS_INLINE_FUNCTION real temperature(real r, real theta, real epsilon, real epsilonTop, real Rin, real Hideal, real trSmoothingTemp) {
+  real z = r * cos(theta);
+  real R = r * sin(theta);
   real R0 = FMAX(R, Rin);
   real Zh = FABS(z / R0) / epsilon;
-  real Tdisk = epsilon * epsilon / R0;
-  real Tcorona = epsilonTop * epsilonTop / R0;
+  real Tdisk = epsilon * epsilon / r;
+  real Tcorona = epsilonTop * epsilonTop / r;
+  // real Tdisk = epsilon * epsilon / R0;
+  // real Tcorona = epsilonTop * epsilonTop / R0;
   return 0.5 * (Tdisk + Tcorona) + 0.5 * (Tcorona - Tdisk) * tanh((Zh - Hideal) / trSmoothingTemp);
 }
 
@@ -138,9 +144,12 @@ void MySourceTerm(Hydro *hydro, const real t, const real dtin) {
         real z = r * cos(th);
         real R = r * sin(th);
 
-        real Teff = temperature(R, z, epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
+        real Teff = temperature(r, th, epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
 
-        // Cooling /heatig function
+        // Cooling /heating function
+        //         real Rmin = FMAX(R, Rin);
+        // real tau = tau0 * pow(Rin, 1.5);
+
         real Ptarget = Teff * Vc(RHO, k, j, i);
         real tau = tau0 * (FMIN(pow(R, 1.5), 1.0));
 

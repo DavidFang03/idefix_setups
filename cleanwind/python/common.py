@@ -73,6 +73,9 @@ class WindyDisk:
 
     #     return macc
 
+    def temperature(self, v):
+        return v.data["PRS"] / v.data["RHO"]
+
     def Macc(self, v):
         """
         (Roberts & Latter 2026 Eq. 19)

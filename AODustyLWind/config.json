@@ -60,9 +60,6 @@
             1e-8,
             1e-5
         ],
-        "style_kwargs": {
-            "cmap": "inferno"
-        },
         "symbol": "$\\rho/\\rho_0$",
         "title": "Gas Density"
     },
