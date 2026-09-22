@@ -104,16 +104,12 @@ quantities = [
         style_kwargs={"cmap": "coolwarm"},
     ),
 ]
+
+for qty in quantities:
+    qty.ymin = -2.5
+    qty.ymax = 2.5
+    qty.xmax = 2.5
 fig1 = Fig(quantities)
-# fig1 = Fig(
-#     [
-#         MapMovie2D("InvDt", plot_coords=[0, 0], streamlines=["VX1", "VX2"]),
-#     ]
-# )
-# fig1.axes[0, 0].xmin = 0
-
-
-custom_fields2D = []
 
 
 # Initialize context

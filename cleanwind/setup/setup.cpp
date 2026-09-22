@@ -160,13 +160,32 @@ void InternalBoundary(Hydro *hydro, const real t) {
 }
 // Default constructor
 
+void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
+  IdefixArray1D<real> r = data.x[IDIR];
+  IdefixArray1D<real> th = data.x[JDIR];
+  real epsilon = epsilonGlob;
+  real Rin = 1.0;
+  idefix_for(
+      "MySoundSpeed", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
+        real R = r(i) * sin(th(j));
+        real R0 = FMAX(R, Rin);
+        cs(k, j, i) = epsilon / sqrt(R0);
+      });
+}
+
 // Initialisation routine. Can be used to allocate
 // Arrays or variables which are used later on
 Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   // Set the function for userdefboundary
   data.hydro->EnrollUserDefBoundary(&Wind::UserdefBoundary);
-  data.hydro->EnrollUserSourceTerm(&Wind::MySourceTerm);
   data.hydro->EnrollInternalBoundary(&InternalBoundary);
+
+#ifndef ISOTHERMAL
+  data.hydro->EnrollUserSourceTerm(&Wind::MySourceTerm);
+#endif
+#ifdef ISOTHERMAL
+  data.hydro->EnrollIsoSoundSpeed(&MySoundSpeed);
+#endif
 
 #ifndef DISABLE_MHD
   data.hydro->EnrollAmbipolarDiffusivity(&Wind::Ambipolar);
@@ -224,16 +243,17 @@ void Setup::InitFlow(DataBlock &data) {
         real R = r * sin(th);
 
         real Rmin = FMAX(R, Rin);
-        real Zh = FABS(z / Rmin) / epsilonGlob;
-        real csdisk = epsilonGlob / sqrt(Rmin);
+        // real Zh = FABS(z / Rmin) / epsilonGlob;
+        // real csdisk = epsilonGlob / sqrt(Rmin);
+        // real cs2 = csdisk * csdisk;
         real temp = Wind::temperature(r, th, epsilonGlob, epsilonTopGlob, Rin, HidealGlob, trSmoothingTempGlob);
-        real cs2 = csdisk * csdisk;
-        // real cs2 = temp;
+        real cs2 = temp;
 
-        d.Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(1.0 / cs2 * (1.0 / r - 1.0 / Rmin));
+        // d.Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(1.0 / cs2 * (1.0 / r - 1.0 / Rmin));
+        real H = epsilonGlob * Rmin;
+        d.Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(-(z * z) / (2 * H * H));
         d.Vc(VX3, k, j, i) = 1.0 / sqrt(Rmin) * sqrt(FMAX(Rmin / r - 2.5 * epsilonGlob * epsilonGlob, 1.0));
         // d.Vc(PRS, k, j, i) = cs2 * d.Vc(RHO, k, j, i);
-        d.Vc(PRS, k, j, i) = temp * d.Vc(RHO, k, j, i);
 
         // if (R > Rin) {
         //   real Zh = FABS(z / R) / epsilonGlob;
@@ -265,8 +285,11 @@ void Setup::InitFlow(DataBlock &data) {
         real densityFloor = Wind::computeDensityFloor(R, z, densityFloorGlob, Rin, epsilonGlob);
         if (d.Vc(RHO, k, j, i) < densityFloor) {
           d.Vc(RHO, k, j, i) = densityFloor;
-          d.Vc(PRS, k, j, i) = cs2 * d.Vc(RHO, k, j, i);
         }
+
+#ifndef ISOTHERMAL
+        d.Vc(PRS, k, j, i) = temp * d.Vc(RHO, k, j, i);
+#endif
 
 #ifndef DISABLE_MHD
         // Vector potential on the corner

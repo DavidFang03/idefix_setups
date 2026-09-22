@@ -52,7 +52,9 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           if (Vc(RHO, k, j, i) < densityFloor)
             Vc(RHO, k, j, i) = densityFloor;
 
+#ifndef ISOTHERMAL
           Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * temp;
+#endif
 
           if (Vc(VX1, k, j, ighost) >= ZERO_F)
             Vc(VX1, k, j, i) = -Vc(VX1, k, j, 2 * ighost - i - 1);
@@ -79,7 +81,10 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           real z = x1(i) * cos(x2(j));
 
           Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
+
+#ifndef ISOTHERMAL
           Vc(PRS, k, j, i) = Vc(PRS, k, j, ighost);
+#endif
 
           if (Vc(VX1, k, j, ighost) <= ZERO_F)
             Vc(VX1, k, j, i) = 0.0;
@@ -107,7 +112,10 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           "UserDefX2_Left_Vc", 0, data->np_tot[KDIR], 0, j_beg, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
             const int jrefl = 2 * j_beg - 1 - j;
             Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
+
+#ifndef ISOTHERMAL
             Vc(PRS, k, j, i) = Vc(PRS, k, jrefl, i);
+#endif
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
             Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
             Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
@@ -128,7 +136,9 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           "UserDefX2_Right_Vc", 0, data->np_tot[KDIR], j_end, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
             const int jrefl = 2 * j_end - 1 - j;
             Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
+#ifndef ISOTHERMAL
             Vc(PRS, k, j, i) = Vc(PRS, k, jrefl, i);
+#endif
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
             Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
             Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
