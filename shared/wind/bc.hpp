@@ -41,6 +41,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
         "UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
           real R = x1(i) * sin(x2(j));
           real z = x1(i) * cos(x2(j));
+          real Rmin = FMAX(R, 1.0);
 
           real r = x1(i);
           real th = x2(j);
@@ -61,7 +62,8 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           else
             Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
           Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
-          Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
+          // Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
+          Vc(VX3, k, j, i) = R * pow(Rmin, 0);
 #ifndef DISABLE_MHD
           Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i - 1);
 #endif
@@ -118,7 +120,8 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 #endif
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
             Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
-            Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
+            // Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
+            Vc(VX3, k, j, i) = ZERO_F;
 #ifndef DISABLE_MHD
             Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i); // https://github.com/idefix-code/idefix/issues/203
 #endif
@@ -141,7 +144,8 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 #endif
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
             Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
-            Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
+            Vc(VX3, k, j, i) = ZERO_F;
+        // Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
 
 #ifndef DISABLE_MHD
             Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i);

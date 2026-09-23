@@ -56,10 +56,6 @@
     },
     "RHO": {
         "norm": "log",
-        "bounds": [
-            1e-8,
-            1e-5
-        ],
         "symbol": "$\\rho/\\rho_0$",
         "title": "Gas Density"
     },

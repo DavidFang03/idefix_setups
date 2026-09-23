@@ -71,6 +71,7 @@ quantities = [
         r"\rho",
         title="Gas density",
         plot_coords=[0, 0],
+        bounds=[5e-11, 2e-10],
         streamlines=["VX1", "VX2"],
         customize=title,
         style_kwargs={"cmap": "viridis"},
@@ -86,12 +87,12 @@ quantities = [
     #     norm="log",
     # ),
     MapMovie2D(
-        "T",
-        r"$T$",
-        title=r"Temperature",
+        "PRS",
+        r"$p$",
+        title=r"Pressure",
         plot_coords=[0, 1],
         streamlines=["VX1", "VX2"],
-        compute=wd.temperature,
+        # compute=wd.temperature,
         norm="log",
     ),
     MapMovie2D(
@@ -100,8 +101,14 @@ quantities = [
         plot_coords=[0, 2],
         streamlines=["VX1", "VX2"],
         compute=wd.vz,
-        bounds=[-1e-5, 1e-5],
+        bounds=[-1e-3, 1e-3],
         style_kwargs={"cmap": "coolwarm"},
+    ),
+    MapMovie2D(
+        "VX3",
+        r"$v_\phi$",
+        plot_coords=[0, 3],
+        streamlines=["VX1", "VX2"],
     ),
 ]
 

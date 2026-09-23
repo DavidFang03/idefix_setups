@@ -114,15 +114,16 @@ KOKKOS_INLINE_FUNCTION real temperature(real r, real theta, real epsilon, real e
   real R = r * sin(theta);
   real R0 = FMAX(R, Rin);
 
-  return epsilon * epsilon / R0;
+  // return epsilon * epsilon / r;
+  // return epsilon * epsilon / R0;
 
-  // real Zh = FABS(z / R0) / epsilon;
-  // // real Tdisk = epsilon * epsilon / r;
-  // // real Tcorona = epsilonTop * epsilonTop / r;
+  real Zh = FABS(z / R0) / epsilon;
+  real Tdisk = epsilon * epsilon / r;
+  real Tcorona = epsilonTop * epsilonTop / r;
   // real Tdisk = epsilon * epsilon / R0;
   // real Tcorona = epsilonTop * epsilonTop / R0;
-  // return 0.5 * (Tdisk + Tcorona) + 0.5 * (Tcorona - Tdisk) * tanh((FABS(z / Rin) - Hideal * epsilon * R0 / Rin));
-  // // return 0.5 * (Tdisk + Tcorona) + 0.5 * (Tcorona - Tdisk) * tanh((Zh - Hideal) / trSmoothingTemp);
+  return 0.5 * (Tdisk + Tcorona) + 0.5 * (Tcorona - Tdisk) * tanh((FABS(z / Rin) - Hideal * epsilon * R0 / Rin));
+  // return 0.5 * (Tdisk + Tcorona) + 0.5 * (Tcorona - Tdisk) * tanh((Zh - Hideal) / trSmoothingTemp);
 }
 
 void MySourceTerm(Hydro *hydro, const real t, const real dtin) {

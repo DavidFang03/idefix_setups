@@ -253,6 +253,9 @@ void Setup::InitFlow(DataBlock &data) {
         real H = epsilonGlob * Rmin;
         d.Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(-(z * z) / (2 * H * H));
         d.Vc(VX3, k, j, i) = 1.0 / sqrt(Rmin) * sqrt(FMAX(Rmin / r - 2.5 * epsilonGlob * epsilonGlob, 1.0));
+        if (R < Rin) {
+          d.Vc(VX3, k, j, i) = R * pow(Rmin, -1.5);
+        }
         // d.Vc(PRS, k, j, i) = cs2 * d.Vc(RHO, k, j, i);
 
         // if (R > Rin) {
