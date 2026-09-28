@@ -15,7 +15,7 @@ projectPath = f"{RUNS_FOLDER_PATH}/cleanwind"
 configPath = f"{RUNS_FOLDER_PATH}/AODustyLWind/config.json"
 # task = "cw_20_b1e4"
 # task = "clean_wind_100_v2_b1e4"
-task = "lr_wind_v8_MHDOFF_b1e4"
+task = "lr_wind_MHDOFF_iso_b1e4"
 runContext = RunContext(
     task,
     projectPath,
@@ -26,6 +26,16 @@ runContext = RunContext(
 eps = 0.05
 betamid = float(runContext.inidata["Setup"]["beta"])
 wd = WindyDisk(runContext.inidata, runContext.gridInfo)
+
+
+def vphi_minus_kepler(v):
+    rgrid, thetagrid = np.meshgrid(v.r, v.theta)
+    Rgrid = rgrid * np.sin(thetagrid)
+    Rmin = np.clip(Rgrid, 1.0, None)
+    vk = Rgrid * Rmin ** (-1.5)
+    print("rmin", np.min(Rmin), np.max(Rmin))
+    return v.data["VX3"]
+    return (v.data["VX3"] - vk) / vk
 
 
 def float_to_latex(num: float) -> str:
@@ -71,38 +81,29 @@ quantities = [
         r"\rho",
         title="Gas density",
         plot_coords=[0, 0],
-        bounds=[5e-11, 2e-10],
+        bounds=[1e-10, 1e-2],
         streamlines=["VX1", "VX2"],
         customize=title,
         style_kwargs={"cmap": "viridis"},
     ),
     # MapMovie2D(
-    #     "beta",
-    #     r"$\beta$",
-    #     title=r"Plasma $\beta$ (poloidal)",
+    #     "PRS",
+    #     r"$p$",
+    #     title=r"Pressure",
     #     plot_coords=[0, 1],
-    #     streamlines=["BX1", "BX2"],
-    #     compute=plasmabeta,
-    #     bounds=[1, betamid],
+    #     streamlines=["VX1", "VX2"],
+    #     # compute=wd.temperature,
     #     norm="log",
     # ),
-    MapMovie2D(
-        "PRS",
-        r"$p$",
-        title=r"Pressure",
-        plot_coords=[0, 1],
-        streamlines=["VX1", "VX2"],
-        # compute=wd.temperature,
-        norm="log",
-    ),
     MapMovie2D(
         "vz",
         r"$v_z$",
         plot_coords=[0, 2],
         streamlines=["VX1", "VX2"],
         compute=wd.vz,
-        bounds=[-1e-3, 1e-3],
+        # bounds=[-0.5, 0.5],
         style_kwargs={"cmap": "coolwarm"},
+        log="TwoSlopeNorm",
     ),
     MapMovie2D(
         "VX3",
@@ -110,12 +111,70 @@ quantities = [
         plot_coords=[0, 3],
         streamlines=["VX1", "VX2"],
     ),
+    # MapMovie2D(
+    #     "VX3_vK",
+    #     r"$(v_\phi - v_\mathrm{K})/v_\mathrm{K}$",
+    #     plot_coords=[0, 3],
+    #     streamlines=["VX1", "VX2"],
+    #     compute=vphi_minus_kepler,
+    #     style_kwargs={"cmap": "coolwarm"},
+    #     bounds=[-1, 1],
+    # ),
+    MapMovie2D(
+        "InvDt",
+        r"InvDt",
+        title="CFL",
+        plot_coords=[0, 4],
+        streamlines=["VX1", "VX2"],
+        norm="log",
+    ),
+    MapMovie2D(
+        "VX1",
+        r"$v_\phi$",
+        plot_coords=[0, 5],
+        streamlines=["VX1", "VX2"],
+        bounds=[-1e-2, 1e-2],
+        style_kwargs={"cmap": "coolwarm"},
+        # xmin=75,
+        # xmax=10,
+        # ymin=-10,
+        # ymax=10,
+    ),
 ]
 
-for qty in quantities:
-    qty.ymin = -2.5
-    qty.ymax = 2.5
-    qty.xmax = 2.5
+# quantities = [
+#     MapMovie2D(
+#         "VX1",
+#         r"$v_\phi$",
+#         plot_coords=[0, 0],
+#         streamlines=["VX1", "VX2"],
+#         bounds=[-5e-4, 1e-4],
+#         style_kwargs={"cmap": "coolwarm"},
+#         # xmin=75,
+#         # xmax=10,
+#         # ymin=-10,
+#         # ymax=10,
+#     ),
+# ]
+
+if "MHDOFF" not in task:
+    quantities.append(
+        MapMovie2D(
+            "beta",
+            r"$\beta$",
+            title=r"Plasma $\beta$ (poloidal)",
+            plot_coords=[0, 5],
+            streamlines=["BX1", "BX2"],
+            compute=plasmabeta,
+            bounds=[1, betamid],
+            norm="log",
+        ),
+    )
+
+# for qty in quantities:
+#     qty.ymin = -2.5
+#     qty.ymax = 2.5
+#     qty.xmax = 2.5
 fig1 = Fig(quantities)
 
 

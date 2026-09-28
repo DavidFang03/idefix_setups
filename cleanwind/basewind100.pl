@@ -19,7 +19,7 @@ sub format_time
     return %time;
 }
 
-my $minutes         = 60;
+my $minutes         = 240;
 # my $minutes         = 2400;
 my $gpus            = 1;
 
@@ -37,7 +37,7 @@ my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus." 1";
-my $name            = "lr_wind_v8_MHDOFF";
+my $name            = "lr_wind_MHDOFF_iso";
 
 # my @betas = ("1e3", "4e3", "7e3", "1e4", "4e4", "6e4", "8e4","1e5");
 # my @betas = ("5e5", "1e6", "5e6","1e7");
@@ -69,9 +69,10 @@ print INI <<ENDOFINI;
 # Trying to follow added mass through density floor (do not use --restart)
 # v7 Minimizing VSI. Increasing beta cooling.  E_phi output. Setting gamma to 1.4 (was 1.0001) to minimise VSI (Lin & Youdin)
 # v8 back to VSI?
-# v9 removing axis
+# v9 fixed initial density profile and vx3. Trying removing eta buffer.
+# Let's reload now
 [Grid]
-X1-grid    1  1.0  168  l   100.0
+X1-grid    1  1.0  168  l   10.0
 X2-grid    3  0.0  128   u  1.28   64  u  1.861592653589  128  u  3.141592653589793
 # X2-grid    3  0.5235987755982988  128   u  1.28   64  u  1.861592653589  128  u  2.6179938779914944
 
@@ -83,7 +84,7 @@ X2-grid    3  0.0  128   u  1.28   64  u  1.861592653589  128  u  3.141592653589
 [TimeIntegrator]
 CFL            0.9
 tstop          100000.0
-first_dt       1.e-14
+first_dt       1.e-9
 nstages        2
 max_runtime    $idefix_limit
 
@@ -92,8 +93,9 @@ max_runtime    $idefix_limit
 solver       hll
 ambipolar    explicit  userdef
 resistivity  explicit  userdef
-gamma        1.0001
-
+gamma        1.05
+viscosity    explicit userdef
+csiso        userdef
 
 
 [Gravity]
@@ -119,10 +121,15 @@ densityFloor           1.0e-10
 transitionSmoothing    0.2
 transitionSmoothingTemp    1.0
 
+alpha        1.0e-3
+
+
+reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/outputs/lr_wind_v8_MHDOFF_b1e4/dump.0012.dmp
+
 [Output]
 uservar    InvDt   addedMass
-# uservar    eta    Am    InvDt   addedMass   Ephi
-vtk        100
+#uservar    eta    Am    InvDt   addedMass   Ephi
+vtk        200
 dmp_dir    $outputs_path_1
 dmp        5000
 log        1000

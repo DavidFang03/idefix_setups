@@ -5,6 +5,8 @@
 using namespace Params;
 namespace Wind {
 
+KOKKOS_INLINE_FUNCTION real window(real R, real z, real epsilon, real Hideal, real trSmoothing) { return tanh((fabs(z) - Hideal * epsilon * R) / (trSmoothing)); }
+
 #ifndef DISABLE_MHD
 void Ambipolar(DataBlock &data, real t, IdefixArray3D<real> &xAin) {
   IdefixArray3D<real> xA = xAin;
@@ -26,18 +28,15 @@ void Ambipolar(DataBlock &data, real t, IdefixArray3D<real> &xAin) {
         real R = FMAX(FABS(x1(i) * sin(x2(j))), ONE_F);
         real Omega = pow(R, -1.5);
 
-        real zh = z / (R * epsilon); // z in units of disc scale height h=R*epsilon
-        real Am;
-
-        Am = AmMid / (0.5 * (1 - tanh((fabs(zh) - Hideal) / trSmoothing)));
+        real Am = 2 * AmMid / (1 - window(R, z, epsilon, Hideal, trSmoothing));
 
         real B2 = Vc(BX1, k, j, i) * Vc(BX1, k, j, i) + Vc(BX2, k, j, i) * Vc(BX2, k, j, i) + Vc(BX3, k, j, i) * Vc(BX3, k, j, i);
         real eta = B2 / (Omega * Am * Vc(RHO, k, j, i));
 
         if (eta > etamax)
-          xA(k, j, i) = etamax / B2; //! SAME THING????
+          xA(k, j, i) = etamax / B2;
         else
-          xA(k, j, i) = 1.0 / (Omega * Am * Vc(RHO, k, j, i)); //! SAME THING????
+          xA(k, j, i) = 1.0 / (Omega * Am * Vc(RHO, k, j, i));
 
         // Kill it at the radial boundaryloop
         if (x1(i) / Rin < Rin * (1 + waveKillWidth)) {
@@ -59,52 +58,26 @@ void Resistivity(DataBlock &data, real t, IdefixArray3D<real> &etain) {
   real epsilon = epsilonGlob;
 
   real R0 = data.mygrid->xbeg[IDIR]; // =1
-  // The constant pre factor for R_m in the dead zone
   real Rm0copy = Rm0;
   real etaBuffer0 = etab0;
 
   idefix_for(
       "Resistivity", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
         real z = x1(i) * cos(x2(j));
-        real R = x1(i) * sin(x2(j)); // cylindric R
+        real R = x1(i) * sin(x2(j));
         real Ri = FMAX(R0, R);
         real r = x1(i);
-        real zh = z / (R * epsilon); //=1 ??? =z/H
-        real Omega = pow(R, -1.5);
-        // Inner region damping. Buffer region
+
+        // Buffer region at inner radius. Linear damping.
         real EtaBuffer = etaBuffer0 * epsilon * epsilon * 0.05 * FMAX((1.25 * R0 - r), 0.0); // # [R0, R0+0.25R0]
 
-        // Transition across disk and corona (want eta to be zero outside the
-        // disk dead zone)
-        real TransDC = 0.5 * (1 - tanh((fabs(zh) - Hideal) / (trSmoothing)));
-        // Transition across the DZI (want eta to be zero outside the disk dead
-        // zone)
-        // real TransDZI = 0.5 * (1 + tanh((R - 10.0) / (0.1 * trSmoothing)));
-        // //! cause eta to diverge->crash
-        // // The expression for the magnetic Reynolds number (R_m) in the dead
-        // // zone of the disk
-        // real RmDZ = RmDZ0 * 1 / (Vc(RHO, k, j, i) * Ri);
-        // // The expression for the Ohmic resistivity in the dead zone of the
-        // disk real etaDZ = pow(epsilon * Ri, 2) * Omega /
-        //              RmDZ; // exact expresion to get eta from Rm.
-        // The final expression for the Ohmic resistivity (includes the buffer
-        // zone contribution). Makes R_M = 50 at the inner edge of the DZI
-        // (feels appropriate - maybe disk slightly heavy? - discuss) eta(k,j,i)
-        // = (pow(Ri,1.5))*Vc(RHO,k,j,i)/(10.0*10.0*pow(10,0.5))*TransDC +
-        // EtaBuffer;
-        // eta(k,j,i) = EtaBuffer +
-        // (pow(Ri,1.5))*Vc(RHO,k,j,i)/2500*TransDZI*TransDC; eta(k,j,i) =
-        // EtaBuffer
-        // + etaDZ;
-        // eta(k, j, i) = etaDZ * TransDC * TransDZI + EtaBuffer;
-        // eta(k, j, i) = EtaBuffer;
-        // real eta0 = pow(epsilon * Ri, 2) * Omega / Rm0copy;
-        // eta0 = 0;
-        // Precription of Roberts,Latter,Lesur (2026): Rm propto 1/(rho R)
+        // Precription of Roberts,Latter,Lesur (2026): Rm = 2 (rho0 r0)/(rho R) * (1-window)^(-1)
+        // Rm -> eta by using Rm = epsilon^2*Omega/eta
+        // Even though Rm goes to infinity, no need for a Rm_max because writing directly eta here.
+
+        real TransDC = 0.5 * (1 - window(R, z, epsilon, Hideal, trSmoothing));
+
         eta(k, j, i) = epsilon * epsilon * pow(Ri, 1.5) * Vc(RHO, k, j, i) / Rm0copy * TransDC + EtaBuffer;
-        // eta(k, j, i) = eta0 * (pow(Ri, 1.5)) * Vc(RHO, k, j, i) /
-        //                    (10.0 * 10.0 * pow(10, 0.5)) * TransDC +
-        //                EtaBuffer;
       });
 }
 #endif
@@ -117,12 +90,12 @@ KOKKOS_INLINE_FUNCTION real temperature(real r, real theta, real epsilon, real e
   // return epsilon * epsilon / r;
   // return epsilon * epsilon / R0;
 
-  real Zh = FABS(z / R0) / epsilon;
-  real Tdisk = epsilon * epsilon / r;
-  real Tcorona = epsilonTop * epsilonTop / r;
-  // real Tdisk = epsilon * epsilon / R0;
-  // real Tcorona = epsilonTop * epsilonTop / R0;
-  return 0.5 * (Tdisk + Tcorona) + 0.5 * (Tcorona - Tdisk) * tanh((FABS(z / Rin) - Hideal * epsilon * R0 / Rin));
+  // real Tdisk = epsilon * epsilon / r;
+  // real Tcorona = epsilonTop * epsilonTop / r;
+  real Tdisk = epsilon * epsilon / R0;
+  real Tcorona = epsilonTop * epsilonTop / R0;
+  return 0.5 * (Tdisk + Tcorona) + 0.5 * (Tcorona - Tdisk) * window(R, z, epsilon, Hideal, trSmoothingTemp);
+  // real Zh = FABS(z / R0) / epsilon;
   // return 0.5 * (Tdisk + Tcorona) + 0.5 * (Tcorona - Tdisk) * tanh((Zh - Hideal) / trSmoothingTemp);
 }
 
@@ -152,13 +125,9 @@ void MySourceTerm(Hydro *hydro, const real t, const real dtin) {
 
         real Teff = temperature(r, th, epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
 
-        // Cooling /heating function
-        //         real Rmin = FMAX(R, Rin);
-        // real tau = tau0 * pow(Rin, 1.5);
-
         real Ptarget = Teff * Vc(RHO, k, j, i);
-        // real tau = tau0 * (FMIN(pow(R, 1.5), 1.0));
-        real tau = tauGlob * pow(R0, 1.5);
+        real tau = tau0 * (FMIN(pow(R, 1.5), 1.0)); // yyy
+        // real tau = tau0 * pow(R0, 1.5);
 
         Uc(ENG, k, j, i) += -dt * (Vc(PRS, k, j, i) - Ptarget) / (tau * gamma_m1);
       });

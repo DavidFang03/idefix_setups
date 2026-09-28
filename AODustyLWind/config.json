@@ -22,11 +22,7 @@
         "style_kwargs": {
             "cmap": "RdBu_r"
         },
-        "symbol": "$v_r$",
-        "bounds": [
-            -0.2,
-            0.2
-        ]
+        "symbol": "$v_r$"
     },
     "Dust0_VX1": {
         "norm": "TwoSlopeNorm",

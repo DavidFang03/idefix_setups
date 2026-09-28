@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Slurm job options (job-name, compute nodes, job time)
-#SBATCH --job-name=lr_wind_v9_b1e4
+#SBATCH --job-name=lr_wind_MHDOFF_ic_b1e4
 #SBATCH --time=04:00:00
 #SBATCH --partition=gpu
 #SBATCH --qos=dev
@@ -26,4 +26,4 @@ export OMP_PLACES=cores
 srun --nodes=1 --ntasks-per-node=1 \
      --hint=nomultithread  --distribution=block:block \
      /home/dp316/dp316/dc-fang1/scripts/wrapper.sh \
-     /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/setup/idefix -dec 1 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/inputs/lr_wind_v9_b1e4.ini
+     /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/setup/idefix -dec 1 1 -i /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/inputs/lr_wind_MHDOFF_ic_b1e4.ini
