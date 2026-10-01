@@ -226,20 +226,6 @@ void EmfBoundary(DataBlock &data, const real t) {
   }
 }
 
-void FluxBoundary(DataBlock &data, int dir, BoundarySide side, const real t) {
-  IdefixArray4D<real> Flux = data.hydro->FluxRiemann[dir];
-  if (dir == IDIR && side == left) {
-    int iref = data.beg[IDIR];
-
-    idefix_for(
-        "FluxBoundLeft", data.beg[KDIR], data.end[KDIR], data.beg[JDIR], data.end[JDIR], KOKKOS_LAMBDA(int k, int j) {
-          if (Flux(RHO, k, j, iref) > 0.0) {
-            Flux(RHO, k, j, iref) = 0.0; // Cancel incoming mass flux.
-          }
-        });
-  }
-}
-
 void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
 
   // Use Invdt as scratch array
@@ -299,8 +285,6 @@ void InternalBoundary(Hydro *hydro, const real t) {
   real Hideal = HidealGlob;
   real trSmoothingTemp = trSmoothingTempGlob;
 
-  IdefixArray3D<real> array1 = myGlobals->array1;
-
   idefix_for(
       "InternalBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
         real R = x1(i) * sin(x2(j));
@@ -319,7 +303,6 @@ void InternalBoundary(Hydro *hydro, const real t) {
 
         real densityFloor = Wind::computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
         if (Vc(RHO, k, j, i) < densityFloor) {
-          array1(k, j, i) = array1(k, j, i) + densityFloor - Vc(RHO, k, j, i);
 
           Vc(RHO, k, j, i) = densityFloor;
         }
@@ -344,7 +327,6 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   data.hydro->EnrollUserSourceTerm(&MySourceTerm);
   data.hydro->EnrollInternalBoundary(&InternalBoundary);
   data.hydro->EnrollEmfBoundary(&EmfBoundary);
-  // data.hydro->EnrollFluxBoundary(&FluxBoundary);
   output.EnrollUserDefVariables(&ComputeUserVars);
   gammaGlob = data.hydro->eos->GetGamma();
   epsilonGlob = input.Get<real>("Setup", "epsilon", 0);

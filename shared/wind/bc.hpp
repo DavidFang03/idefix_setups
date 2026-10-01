@@ -35,7 +35,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
     real trSmoothingTemp = trSmoothingTempGlob;
     real epsilonTop = epsilonTopGlob;
     real Hideal = HidealGlob;
-    // real csdisk = epsilonGlob / sqrt(Rin);
+    real csdisk = epsilonGlob / sqrt(Rin);
 
     hydro->boundary->BoundaryFor(
         "UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
@@ -48,7 +48,8 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 
           real temp = Wind::temperature(r, th, epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
 
-          Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
+          // Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
+          Vc(RHO, k, j, i) = 1.0 / (Rin * sqrt(Rin)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(Rin * Rin + z * z) - 1.0 / Rin));
           real densityFloor = Wind::computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
           if (Vc(RHO, k, j, i) < densityFloor)
             Vc(RHO, k, j, i) = densityFloor;
@@ -62,10 +63,8 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           else
             Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
 
-          // Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
-
           Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
-          Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
+          // Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
           Vc(VX3, k, j, i) = R * pow(Rmin, -1.5);
 #ifndef DISABLE_MHD
           Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i - 1);
@@ -125,7 +124,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
             Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
             Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
-            Vc(VX3, k, j, i) = ZERO_F;
+        // Vc(VX3, k, j, i) = ZERO_F;
 #ifndef DISABLE_MHD
             Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i); // https://github.com/idefix-code/idefix/issues/203
 #endif
@@ -149,7 +148,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
             Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
             Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
             Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
-            Vc(VX3, k, j, i) = ZERO_F;
+        // Vc(VX3, k, j, i) = ZERO_F;
 
 #ifndef DISABLE_MHD
             Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i);

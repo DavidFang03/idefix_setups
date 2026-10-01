@@ -15,7 +15,7 @@ projectPath = f"{RUNS_FOLDER_PATH}/cleanwind"
 configPath = f"{RUNS_FOLDER_PATH}/AODustyLWind/config.json"
 # task = "cw_20_b1e4"
 # task = "clean_wind_100_v2_b1e4"
-task = "lr_wind_MHDOFF_iso_b1e4"
+task = "lr_wind_v_b1e4"
 runContext = RunContext(
     task,
     projectPath,
@@ -96,6 +96,13 @@ quantities = [
     #     norm="log",
     # ),
     MapMovie2D(
+        "Am",
+        r"Am",
+        title=r"Am",
+        plot_coords=[0, 1],
+        norm="log",
+    ),
+    MapMovie2D(
         "vz",
         r"$v_z$",
         plot_coords=[0, 2],
@@ -163,7 +170,7 @@ if "MHDOFF" not in task:
             "beta",
             r"$\beta$",
             title=r"Plasma $\beta$ (poloidal)",
-            plot_coords=[0, 5],
+            plot_coords=[0, 6],
             streamlines=["BX1", "BX2"],
             compute=plasmabeta,
             bounds=[1, betamid],
