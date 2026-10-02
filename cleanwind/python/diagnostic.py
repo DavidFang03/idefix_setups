@@ -15,7 +15,7 @@ projectPath = f"{RUNS_FOLDER_PATH}/cleanwind"
 configPath = f"{RUNS_FOLDER_PATH}/AODustyLWind/config.json"
 # task = "cw_20_b1e4"
 # task = "clean_wind_100_v2_b1e4"
-task = "lr_wind_MHDOFF_iso_b1e4"
+task = "lr_wind_v_b1e4"
 runContext = RunContext(
     task,
     projectPath,
@@ -101,7 +101,7 @@ quantities = [
         plot_coords=[0, 2],
         streamlines=["VX1", "VX2"],
         compute=wd.vz,
-        # bounds=[-0.5, 0.5],
+        bounds=[-1e-3, 1e-3],
         style_kwargs={"cmap": "coolwarm"},
         log="TwoSlopeNorm",
     ),
@@ -142,6 +142,7 @@ quantities = [
     ),
 ]
 
+
 # quantities = [
 #     MapMovie2D(
 #         "VX1",
@@ -157,19 +158,29 @@ quantities = [
 #     ),
 # ]
 
-if "MHDOFF" not in task:
-    quantities.append(
+MHD = False
+
+if "MHDOFF" not in task and MHD:
+    quantities += [
         MapMovie2D(
             "beta",
             r"$\beta$",
             title=r"Plasma $\beta$ (poloidal)",
-            plot_coords=[0, 5],
+            plot_coords=[0, 6],
             streamlines=["BX1", "BX2"],
             compute=plasmabeta,
             bounds=[1, betamid],
             norm="log",
         ),
-    )
+        MapMovie2D(
+            "Am",
+            r"Am",
+            title=r"Am",
+            plot_coords=[0, 1],
+            norm="log",
+        ),
+    ]
+
 
 # for qty in quantities:
 #     qty.ymin = -2.5

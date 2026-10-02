@@ -3,15 +3,12 @@
 #include "../../shared/wind/floor.hpp"
 #include "../../shared/wind/ionisation.hpp"
 #include "../../shared/wind/params.hpp"
-#include "analysis.hpp"
 #include "dumpImage.hpp"
 #include "idefix.hpp"
 
 using namespace Params;
 
 static std::string dat_path;
-
-Analysis *analysis;
 
 class MyGlobalClass {
 public:
@@ -56,10 +53,10 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
 #ifndef DISABLE_MHD
   // Use Invdt as scratch array
   IdefixArray3D<real> scrh("Scratch", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
-  IdefixArray3D<real> scrh_eta("Scratch_eta", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
-  // Ask for a computation of xA ambipolar in this scratch array
-  Wind::Resistivity(data, data.t, scrh_eta);
-  Wind::Ambipolar(data, data.t, scrh);
+  // IdefixArray3D<real> scrh_eta("Scratch_eta", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
+  // // Ask for a computation of xA ambipolar in this scratch array
+  Wind::Resistivity(data, data.t, scrh);
+  // Wind::Ambipolar(data, data.t, scrh);
 #endif
 
   IdefixArray3D<real> array1 = myGlobals->array1;
@@ -74,16 +71,19 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   // IdefixHostArray3D) Note that the labels should match the variable names in
   // the input file
 #ifndef DISABLE_MHD
-  IdefixHostArray3D<real> eta = variables["eta"];
+  // IdefixHostArray3D<real> eta = variables["eta"];
   IdefixHostArray3D<real> Am = variables["Am"];
-  IdefixHostArray3D<real> EPhi = variables["Ephi"];
-  IdefixArray3D<real>::HostMirror scrhHost = Kokkos::create_mirror_view(scrh);
-  Kokkos::deep_copy(scrhHost, scrh);
-  IdefixArray3D<real>::HostMirror scrhHost_eta = Kokkos::create_mirror_view(scrh_eta);
-  Kokkos::deep_copy(scrhHost_eta, scrh_eta);
+
+  // IdefixHostArray3D<real> EPhi = variables["Ephi"];
+  // IdefixArray3D<real>::HostMirror scrhHost = Kokkos::create_mirror_view(scrh);
+  // Kokkos::deep_copy(scrhHost, scrh);
+  // IdefixArray3D<real>::HostMirror scrhHost_eta = Kokkos::create_mirror_view(scrh_eta);
+  // Kokkos::deep_copy(scrhHost_eta, scrh_eta);
+  IdefixArray3D<real>::host_mirror_type scrhHost = Kokkos::create_mirror_view(scrh);
 #endif
+
   IdefixHostArray3D<real> InvDt = variables["InvDt"];
-  IdefixHostArray3D<real> addedMass = variables["addedMass"];
+  // IdefixHostArray3D<real> addedMass = variables["addedMass"];
   // IdefixHostArray1D<real> vpsi = variables["vpsi"];
 
   // Vpsi(data, vpsi);
@@ -92,7 +92,7 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   IdefixHostArray1D<real> x2 = d.x[JDIR];
   IdefixHostArray4D<real> Vc = d.Vc;
 
-  IdefixArray3D<real>::HostMirror scrhHost_addedMass = Kokkos::create_mirror_view(array1);
+  // IdefixArray3D<real>::HostMirror scrhHost_addedMass = Kokkos::create_mirror_view(array1);
 
   for (int k = d.beg[KDIR]; k < d.end[KDIR]; k++) {
     for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
@@ -101,19 +101,18 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
         real R = FMAX(FABS(x1(i) * sin(x2(j))), ONE_F);
         real Omega = pow(R, -1.5);
 #ifndef DISABLE_MHD
-        eta(k, j, i) = scrhHost_eta(k, j, i);
-        Am(k, j, i) = 1.0 / (Omega * scrhHost(k, j, i) * Vc(RHO, k, j, i));
-        EPhi(k, j, i) = d.Ex3(k, j, i);
+        // eta(k, j, i) = scrhHost_eta(k, j, i);
+        // Am(k, j, i) = 1.0 / (Omega * scrhHost(k, j, i) * Vc(RHO, k, j, i));
+        // EPhi(k, j, i) = d.Ex3(k, j, i);
+        Am(k, j, i) = scrhHost(k, j, i);
 #endif
         InvDt(k, j, i) = d.InvDt(k, j, i);
-        addedMass(k, j, i) = scrhHost_addedMass(k, j, i);
+        // addedMass(k, j, i) = scrhHost_addedMass(k, j, i);
         // vpsi(k, j, i) = vpsi(k, j, i);
       }
     }
   }
 }
-
-void AnalysisFunction(DataBlock &data) { analysis->PerformAnalysis(data); }
 
 void InternalBoundary(Hydro *hydro, const real t) {
   auto *data = hydro->data;
@@ -132,6 +131,9 @@ void InternalBoundary(Hydro *hydro, const real t) {
   real densityFloor0 = densityFloorGlob;
   real Rin = 1.0;
   real epsilon = epsilonGlob;
+  real epsilonTop = epsilonTopGlob;
+  real Hideal = HidealGlob;
+  real trSmoothingTemp = trSmoothingTempGlob;
 
   IdefixArray3D<real> array1 = myGlobals->array1;
 
@@ -147,9 +149,7 @@ void InternalBoundary(Hydro *hydro, const real t) {
         real myMax = vAmax;
         // if(x1(i)<1.1) myMax=myMax/50.0;
         if (va2 > myMax * myMax) {
-          real T = Vc(PRS, k, j, i) / Vc(RHO, k, j, i);
           Vc(RHO, k, j, i) = b2 / (myMax * myMax);
-          Vc(PRS, k, j, i) = T * Vc(RHO, k, j, i);
         }
 #endif
 
@@ -159,6 +159,11 @@ void InternalBoundary(Hydro *hydro, const real t) {
 
           Vc(RHO, k, j, i) = densityFloor;
         }
+
+#ifndef ISOTHERMAL
+        real temp = Wind::temperature(x1(i), x2(j), epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
+        Vc(PRS, k, j, i) = temp * Vc(RHO, k, j, i);
+#endif
       });
 }
 // Default constructor
@@ -173,20 +178,6 @@ void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
         real R = r(i) * sin(th(j));
         real R0 = FMAX(R, Rin);
         cs(k, j, i) = epsilon / sqrt(R0);
-      });
-}
-
-void MyViscosity(DataBlock &data, const real t, IdefixArray3D<real> &eta1, IdefixArray3D<real> &eta2) {
-  IdefixArray4D<real> Vc = data.hydro->Vc;
-  IdefixArray1D<real> x1 = data.x[IDIR];
-  real epsilon = epsilonGlob;
-  real alpha = alphaGlob;
-  idefix_for(
-      "MyViscosity", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-        real R = x1(i);
-        real cs = epsilon / sqrt(R);
-        eta1(k, j, i) = alpha * cs * epsilon * R * Vc(RHO, k, j, i);
-        eta2(k, j, i) = ZERO_F;
       });
 }
 
@@ -207,14 +198,12 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   data.hydro->EnrollAmbipolarDiffusivity(&Wind::Ambipolar);
   data.hydro->EnrollOhmicDiffusivity(&Wind::Resistivity);
   data.hydro->EnrollEmfBoundary(&Wind::EmfBoundary);
-#else
-  data.hydro->viscosity->EnrollViscousDiffusivity(&MyViscosity);
 #endif
   output.EnrollUserDefVariables(&ComputeUserVars);
 
   myGlobals = new MyGlobalClass(data);
 
-  alphaGlob = input.Get<real>("Setup", "alpha", 0);
+  // alphaGlob = input.Get<real>("Setup", "alpha", 0);
 
   gammaGlob = data.hydro->eos->GetGamma();
   tauGlob = input.Get<real>("Setup", "tau0", 0);
@@ -230,17 +219,9 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
   Rm0 = input.Get<real>("Setup", "Rm0", 0);
   etab0 = input.Get<real>("Setup", "etab0", 0);
 
-  dat_path = input.Get<std::string>("Output", "dat_path", 0);
 #ifdef RELOAD
   reload_path = input.Get<std::string>("Setup", "reload_path", 0);
 #endif
-
-  analysis = new Analysis(input, grid, data, output, dat_path);
-  output.EnrollAnalysis(&AnalysisFunction);
-  // Reset analysis if required
-  if (!input.restartRequested) {
-    analysis->ResetAnalysis();
-  }
 }
 
 // This routine initialize the flow
@@ -255,8 +236,8 @@ void Setup::InitFlow(DataBlock &data) {
 #ifndef DISABLE_MHD
   IdefixHostArray4D<real> A = IdefixHostArray4D<real>("Setup_VectorPotential", 3, data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
 #endif
-
   real Rin = 1.0;
+
 #ifdef RELOAD
   DumpImage image(reload_path, &data);
 
@@ -292,16 +273,17 @@ void Setup::InitFlow(DataBlock &data) {
 
         real H = epsilonGlob * Rmin;
         d.Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(-(z * z) / (2 * H * H));
-        d.Vc(VX3, k, j, i) = 1.0 / sqrt(Rmin) * sqrt(FMAX(Rmin / r - 2.5 * epsilonGlob * epsilonGlob, 1.0));
+
+        d.Vc(VX1, k, j, i) = ZERO_F;
+        d.Vc(VX2, k, j, i) = ZERO_F;
+
+        d.Vc(VX3, k, j, i) = 1.0 / sqrt(Rmin) * sqrt(FMAX(Rmin / r - 2.5 * epsilonGlob * epsilonGlob, 0.0));
         if (R < Rin) {
           d.Vc(VX3, k, j, i) = R * pow(Rmin, -1.5);
         }
         // real only_disk = 0.5 * (1 - Wind::window(R, z, epsilonGlob, HidealGlob, trSmoothingGlob));
         // real exclude_disk = 1 - only_disk;
         // d.Vc(VX3, k, j, i) = d.Vc(VX3, k, j, i) * only_disk; // better ic?
-
-        d.Vc(VX1, k, j, i) = ZERO_F;
-        d.Vc(VX2, k, j, i) = ZERO_F;
 
         // // better ic?
         // real vz0 = 1.0;
@@ -331,9 +313,6 @@ void Setup::InitFlow(DataBlock &data) {
         real z = r * cos(th);
         real R = r * sin(th);
 
-        real Rmin = FMAX(R, Rin);
-        // Vector potential on the corner
-
         real m = -5.0 / 4.0;
         real B0 = epsilonGlob * sqrt(2.0 / betaGlob);
 
@@ -341,7 +320,6 @@ void Setup::InitFlow(DataBlock &data) {
         A(JDIR, k, j, i) = ZERO_F;
 
         if (R > Rin) {
-          A(KDIR, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0));
           A(KDIR, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0) + Rin * Rin / (2.0 * R));
         } else {
           A(KDIR, k, j, i) = B0 * R / 2.0;

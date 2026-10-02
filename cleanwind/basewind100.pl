@@ -37,11 +37,9 @@ my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus." 1";
-my $name            = "lr_wind_MHDOFF_iso";
+my $name            = "lr_wind_v";
 
-# my @betas = ("1e3", "4e3", "7e3", "1e4", "4e4", "6e4", "8e4","1e5");
-# my @betas = ("5e5", "1e6", "5e6","1e7");
-my @betas = ("1e4", "1e5", "1e6","1e7");
+my @betas = ("1.0e4", "1.0e5", "1.0e6","1.0e7");
 # my @indexes = (3);
 # my @indexes = (0,3,7);
 # my @indexes = (0,1,2,3);
@@ -72,7 +70,7 @@ print INI <<ENDOFINI;
 # v9 fixed initial density profile and vx3. Trying removing eta buffer.
 # Let's reload now
 [Grid]
-X1-grid    1  1.0  168  l   10.0
+X1-grid    1  1.0  768  l   100.0
 X2-grid    3  0.0  128   u  1.28   64  u  1.861592653589  128  u  3.141592653589793
 # X2-grid    3  0.5235987755982988  128   u  1.28   64  u  1.861592653589  128  u  2.6179938779914944
 
@@ -89,13 +87,12 @@ nstages        2
 max_runtime    $idefix_limit
 
 [Hydro]
-# solver       hlld
-solver       hll
+solver       hlld
+# solver       hll
 ambipolar    explicit  userdef
-resistivity  explicit  userdef
-gamma        1.05
-viscosity    explicit userdef
-csiso        userdef
+#resistivity  explicit  userdef
+gamma        1.0001
+# csiso        userdef
 
 
 [Gravity]
@@ -117,25 +114,22 @@ beta                   $beta
 epsilonTop             0.2 # just for temperature: Tcorona/Tdisk = (epsilonTop/epsilon)**2
 Hideal                 5.0 # height of the corona
 Am                     1.0
-densityFloor           1.0e-10
-transitionSmoothing    0.2
-transitionSmoothingTemp    1.0
+densityFloor           1.0e-7
+transitionSmoothing    0.5
+transitionSmoothingTemp    0.5
 
-alpha        1.0e-3
 
 
 reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/outputs/lr_wind_v8_MHDOFF_b1e4/dump.0012.dmp
 
 [Output]
-uservar    InvDt   addedMass
+uservar    InvDt Am
 #uservar    eta    Am    InvDt   addedMass   Ephi
-vtk        200
+vtk        5.0
 dmp_dir    $outputs_path_1
-dmp        5000
+dmp        2000.0
 log        1000
 vtk_dir    $vtksdir1
-dat_path   $outputs_path_1/timevol.dat
-analysis   1
 
 # File produced automatically by a Perl script
 # Do not edit
@@ -164,8 +158,10 @@ print SCRIPT <<ENDOFSCRIPT;
 cd $setup_dir
 # Load the correct modules for the run
 
-module load gcc/9.3.0
+# module load gcc/9.3.0
+module load gcc/12.2.0
 module load openmpi/4.1.5-cuda12.3
+
 
 export OMP_NUM_THREADS=1
 export OMP_PLACES=cores

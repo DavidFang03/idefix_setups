@@ -5,18 +5,18 @@ using namespace Params;
 
 namespace Wind {
 KOKKOS_INLINE_FUNCTION real computeDensityFloor(real R, real z, real d_floor_0, real Rin, real c0) {
-  return d_floor_0;
+  // return d_floor_0;
 
-  //     real D_return;
-  // if (R > Rin) {
-  //   D_return = d_floor_0 / (R * sqrt(R)) * 1.0 / (z * z + 1.2 * (c0 * R) * (c0 * R));
-  // } else {
-  //   D_return = d_floor_0 / (Rin * sqrt(Rin)) * 1.0 / (z * z + 1.2 * (c0 * Rin) * (c0 * Rin));
-  // }
-  // if (D_return < 1.0e-10) {
-  //   D_return = 1e-10;
-  // }
-  // return D_return;
+  real D_return;
+  if (R > Rin) {
+    D_return = d_floor_0 / (R * sqrt(R)) * 1.0 / (z * z + 1.2 * (c0 * R) * (c0 * R));
+  } else {
+    D_return = d_floor_0 / (Rin * sqrt(Rin)) * 1.0 / (z * z + 1.2 * (c0 * Rin) * (c0 * Rin));
+  }
+  if (D_return < 1.0e-9) {
+    D_return = 1e-9;
+  }
+  return D_return;
 }
 
 KOKKOS_INLINE_FUNCTION real computeVaMax(real t_change, real Va_ini_max, real Va_fin_max, real t) {
