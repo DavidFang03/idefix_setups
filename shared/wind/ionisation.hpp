@@ -33,7 +33,7 @@ void Ambipolar(DataBlock &data, real t, IdefixArray3D<real> &xAin) {
         real R = FMAX(FABS(x1(i) * sin(x2(j))), Rin);
         real Omega = pow(R, -1.5);
 
-        real Am = 2 * AmMid / (1 - window(R, z, Rin, epsilon, Hideal, trSmoothing));
+        real Am = 2 * AmMid / (1.0 - window(R, z, Rin, epsilon, Hideal, trSmoothing));
 
         real B2 = Vc(BX1, k, j, i) * Vc(BX1, k, j, i) + Vc(BX2, k, j, i) * Vc(BX2, k, j, i) + Vc(BX3, k, j, i) * Vc(BX3, k, j, i);
         real eta = B2 / (Omega * Am * Vc(RHO, k, j, i));
@@ -58,19 +58,21 @@ void Resistivity(DataBlock &data, real t, IdefixArray3D<real> &etain) {
   IdefixArray1D<real> x2 = data.x[JDIR];
   IdefixArray4D<real> Vc = data.hydro->Vc;
 
+  real epsilon = epsilonGlob;
   real trSmoothing = trSmoothingGlob;
   real Hideal = HidealGlob;
-  real epsilon = epsilonGlob;
 
-  real Rin = data.mygrid->xbeg[IDIR]; // =1
+  real Rin = 1.0; // =1
   real Rm0copy = Rm0;
   real etaBuffer0 = etab0;
 
   idefix_for(
       "Resistivity", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-        real z = x1(i) * cos(x2(j));
-        real R = x1(i) * sin(x2(j));
         real r = x1(i);
+        real R = r * sin(x2(j));
+        real z = r * cos(x2(j));
+
+        real R0 = max(R, Rin);
 
         // Buffer region at inner radius. Linear damping.
         real EtaBuffer = etaBuffer0 * epsilon * epsilon * 0.05 * FMAX((1.25 * Rin - r), 0.0); // # [Rin, Rin+0.25R0]
@@ -79,9 +81,11 @@ void Resistivity(DataBlock &data, real t, IdefixArray3D<real> &etain) {
         // Rm -> eta by using Rm = H^2*Omega/eta => eta= epsilon**2 * R^(2-1.5) / Rm = epsilon**2 * R**1.5 *rho * (1-window)/ (2 * Rm0)
         // Even though Rm goes to infinity, no need for a Rm_max because writing directly eta here.
 
-        real TransDC = 0.5 * (1 - window(R, z, Rin, epsilon, Hideal, trSmoothing));
+        real TransDC = 0.5 * (1.0 - window(R, z, Rin, epsilon, Hideal, trSmoothing));
 
-        eta(k, j, i) = epsilon * epsilon * pow(R, 1.5) * Vc(RHO, k, j, i) / Rm0copy * TransDC + EtaBuffer;
+        real etaO = epsilon * epsilon * Rin * sqrt(Rin) * Vc(RHO, k, j, i) / Rm0copy * TransDC + EtaBuffer;
+
+        eta(k, j, i) = etaO;
       });
 }
 #endif

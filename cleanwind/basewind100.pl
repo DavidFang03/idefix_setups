@@ -39,9 +39,7 @@ my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus." 1";
 my $name            = "lr_wind_v";
 
-# my @betas = ("1e3", "4e3", "7e3", "1e4", "4e4", "6e4", "8e4","1e5");
-# my @betas = ("5e5", "1e6", "5e6","1e7");
-my @betas = ("1e4", "1e5", "1e6","1e7");
+my @betas = ("1.0e4", "1.0e5", "1.0e6","1.0e7");
 # my @indexes = (3);
 # my @indexes = (0,3,7);
 # my @indexes = (0,1,2,3);
@@ -90,7 +88,7 @@ max_runtime    $idefix_limit
 
 [Hydro]
 solver       hlld
-# solver       hllc
+# solver       hll
 ambipolar    explicit  userdef
 #resistivity  explicit  userdef
 gamma        1.0001
@@ -104,8 +102,8 @@ Mcentral     1.0
 [Boundary]
 X1-beg    userdef
 X1-end    userdef
-X2-beg    axis
-X2-end    axis
+X2-beg    userdef
+X2-end    userdef
 
 [Setup]
 Rm0                    20.0
@@ -117,8 +115,8 @@ epsilonTop             0.2 # just for temperature: Tcorona/Tdisk = (epsilonTop/e
 Hideal                 5.0 # height of the corona
 Am                     1.0
 densityFloor           1.0e-7
-transitionSmoothing    0.2
-transitionSmoothingTemp    0.2
+transitionSmoothing    0.5
+transitionSmoothingTemp    0.5
 
 
 
@@ -127,9 +125,9 @@ reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/outputs/
 [Output]
 uservar    InvDt Am
 #uservar    eta    Am    InvDt   addedMass   Ephi
-vtk        5
+vtk        5.0
 dmp_dir    $outputs_path_1
-dmp        5000
+dmp        2000.0
 log        1000
 vtk_dir    $vtksdir1
 
