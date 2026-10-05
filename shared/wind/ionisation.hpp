@@ -9,6 +9,7 @@ KOKKOS_INLINE_FUNCTION real window(real R, real z, real Rin, real epsilon, real 
   // real R0 = max(R, Rin);
   // real zh = z / (R0 * epsilon);
   real zh = z / (R * epsilon);
+  // return tanh((fabs(z) - Hideal * R * epsilon) / trSmoothing);
   return tanh((fabs(zh) - Hideal) / (trSmoothing));
 }
 

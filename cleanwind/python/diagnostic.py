@@ -15,7 +15,7 @@ projectPath = f"{RUNS_FOLDER_PATH}/cleanwind"
 configPath = f"{RUNS_FOLDER_PATH}/AODustyLWind/config.json"
 # task = "cw_20_b1e4"
 # task = "clean_wind_100_v2_b1e4"
-task = "lr_wind_v_b1e4"
+task = "v2_b1e4_iso"
 runContext = RunContext(
     task,
     projectPath,
@@ -26,6 +26,10 @@ runContext = RunContext(
 eps = 0.05
 betamid = float(runContext.inidata["Setup"]["beta"])
 wd = WindyDisk(runContext.inidata, runContext.gridInfo)
+
+
+def temperature(v):
+    return v.data["PRS"] / v.data["RHO"]
 
 
 def vphi_minus_kepler(v):
@@ -70,6 +74,7 @@ def plasmabeta(v):
 
 
 def title(ax, v):
+    return
     fig = ax.get_figure()
     fig.suptitle(rf"$t={float_to_latex(v.t[0] / (2 * np.pi))}$ yr")
 
@@ -86,22 +91,13 @@ quantities = [
         customize=title,
         style_kwargs={"cmap": "viridis"},
     ),
-    # MapMovie2D(
-    #     "PRS",
-    #     r"$p$",
-    #     title=r"Pressure",
-    #     plot_coords=[0, 1],
-    #     streamlines=["VX1", "VX2"],
-    #     # compute=wd.temperature,
-    #     norm="log",
-    # ),
     MapMovie2D(
         "vz",
         r"$v_z$",
         plot_coords=[0, 2],
         streamlines=["VX1", "VX2"],
         compute=wd.vz,
-        bounds=[-1e-3, 1e-3],
+        bounds=[-1e-4, 1e-4],
         style_kwargs={"cmap": "coolwarm"},
         log="TwoSlopeNorm",
     ),
@@ -110,6 +106,8 @@ quantities = [
         r"$v_\phi$",
         plot_coords=[0, 3],
         streamlines=["VX1", "VX2"],
+        bounds=[1e-1, 1],
+        norm="log",
     ),
     # MapMovie2D(
     #     "VX3_vK",
@@ -130,7 +128,7 @@ quantities = [
     ),
     MapMovie2D(
         "VX1",
-        r"$v_\phi$",
+        r"$v_r$",
         plot_coords=[0, 5],
         streamlines=["VX1", "VX2"],
         bounds=[-1e-2, 1e-2],
@@ -160,7 +158,7 @@ quantities = [
 
 MHD = False
 
-if "MHDOFF" not in task and MHD:
+if "MHDOFF" not in task and "iso" not in task:
     quantities += [
         MapMovie2D(
             "beta",
@@ -180,6 +178,19 @@ if "MHDOFF" not in task and MHD:
             norm="log",
         ),
     ]
+
+if "iso" not in task:
+    quantities.append(
+        MapMovie2D(
+            "T",
+            r"$T$",
+            title=r"Temperature",
+            plot_coords=[0, 1],
+            streamlines=["VX1", "VX2"],
+            compute=wd.temperature,
+            norm="log",
+        ),
+    )
 
 
 # for qty in quantities:

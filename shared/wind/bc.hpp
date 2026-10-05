@@ -30,11 +30,13 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
     int ighost = data->nghost[IDIR];
     real Rin = 1.0;
     real cscorona = epsilonTopGlob / sqrt(Rin);
-    real densityFloor0 = densityFloorGlob;
     real epsilon = epsilonGlob;
     real trSmoothingTemp = trSmoothingTempGlob;
     real epsilonTop = epsilonTopGlob;
     real Hideal = HidealGlob;
+    real densityFloor0 = densityFloorGlob;
+
+    real Omega0 = 1.0;
     real csdisk = epsilonGlob / sqrt(Rin);
 
     hydro->boundary->BoundaryFor(
@@ -43,16 +45,23 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           real z = x1(i) * cos(x2(j));
           real Rmin = FMAX(R, 1.0);
 
+          real H = epsilon * Rmin;
+
           real r = x1(i);
           real th = x2(j);
 
-          real temp = Wind::temperature(r, th, epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
+          // real temp = Wind::temperature(r, th, epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
 
           // Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
-          Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
+          Vc(RHO, k, j, i) = 1.0 / (Rin * sqrt(Rin)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(Rin * Rin + z * z) - 1.0 / Rin));
+          // Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(-(z * z) / (2 * H * H));
+          real densityFloor = computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
+          if (Vc(RHO, k, j, i) < densityFloor)
+            Vc(RHO, k, j, i) = densityFloor;
 
 #ifndef ISOTHERMAL
-          Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * temp;
+          // Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * temp;
+          Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * csdisk * csdisk;
 #endif
 
           if (Vc(VX1, k, j, ighost) >= ZERO_F)
@@ -61,8 +70,8 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
             Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
 
           Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
-          Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
-      // Vc(VX3, k, j, i) = R * pow(Rmin, -1.5);
+          // Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
+          Vc(VX3, k, j, i) = R * Omega0;
 #ifndef DISABLE_MHD
           Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i - 1);
 #endif

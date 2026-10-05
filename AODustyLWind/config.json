@@ -38,10 +38,6 @@
         "symbol": "$v_\\theta$"
     },
     "VX3": {
-        "bounds": [
-            0,
-            0.5
-        ],
         "style_kwargs": {
             "cmap": "inferno"
         },

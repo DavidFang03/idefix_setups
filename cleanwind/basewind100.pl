@@ -19,8 +19,8 @@ sub format_time
     return %time;
 }
 
-my $minutes         = 240;
-# my $minutes         = 2400;
+# my $minutes         = 240;
+my $minutes         = 2400;
 my $gpus            = 1;
 
 my %time_results    = format_time($minutes);
@@ -29,17 +29,17 @@ my $folder_name     = "cleanwind";
 my $folder_path     = "/home/dp316/dp316/dc-fang1/IdefixRuns/".$folder_name."/";
 my $indir           = $folder_path."inputs/";
 my $time            = $time_results{slurm};
-# my $qos             = "standard";
-my $qos             = "dev";
+my $qos             = "standard";
+# my $qos             = "dev";
 my $nodes           = "1";
 my $gres            = "gpu:$gpus";
 my $ntasks_per_node = $gpus;
 my $setup_dir      = $folder_path."setup";
 my $IDEFIX_EXE      = $setup_dir."/idefix";
 my $options         = "-dec ".$gpus." 1";
-my $name            = "lr_wind_v";
+my $name            = "wind_02_iso";
 
-my @betas = ("1.0e4", "1.0e5", "1.0e6","1.0e7");
+my @betas = ("1e4", "1e5", "1e6","1e7");
 # my @indexes = (3);
 # my @indexes = (0,3,7);
 # my @indexes = (0,1,2,3);
@@ -88,11 +88,11 @@ max_runtime    $idefix_limit
 
 [Hydro]
 solver       hlld
-# solver       hll
+#solver       hll
 ambipolar    explicit  userdef
-#resistivity  explicit  userdef
+resistivity  explicit  userdef
 gamma        1.0001
-# csiso        userdef
+csiso        userdef
 
 
 [Gravity]
@@ -115,17 +115,18 @@ epsilonTop             0.2 # just for temperature: Tcorona/Tdisk = (epsilonTop/e
 Hideal                 5.0 # height of the corona
 Am                     1.0
 densityFloor           1.0e-7
-transitionSmoothing    0.5
-transitionSmoothingTemp    0.5
+transitionSmoothing    0.2
+transitionSmoothingTemp    0.2
 
 
 
 reload_path             /home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind/outputs/lr_wind_v8_MHDOFF_b1e4/dump.0012.dmp
 
 [Output]
-uservar    InvDt Am
+# uservar    InvDt Am 
+uservar    InvDt Am Ephi
 #uservar    eta    Am    InvDt   addedMass   Ephi
-vtk        5.0
+vtk        20.0
 dmp_dir    $outputs_path_1
 dmp        2000.0
 log        1000
