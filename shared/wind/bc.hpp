@@ -11,10 +11,10 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
   /* User-defined boundaries for a 2.5D disk.
 
   Radial boundary: inspired from test/MHD/AmbipolarWind
-  - Inner: solid body
+  - Inner: solid body rotation + outflow
   - Outer: outflow
 
-  Polar boundary: "axis", see (Zhu & Stone 2018)
+  Polar boundary: "axis", (Zhu & Stone 2018)
   */
 
   auto *data = hydro->data;
@@ -50,18 +50,26 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           real r = x1(i);
           real th = x2(j);
 
-          // real temp = Wind::temperature(r, th, epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
+          //           Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(-(z * z) / (2 * H * H));
+          //           real densityFloor = computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
+          //           if (Vc(RHO, k, j, i) < densityFloor)
+          //             Vc(RHO, k, j, i) = densityFloor;
 
-          // Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
-          Vc(RHO, k, j, i) = 1.0 / (Rin * sqrt(Rin)) * exp(1.0 / (csdisk * csdisk) * (1.0 / sqrt(Rin * Rin + z * z) - 1.0 / Rin));
-          // Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(-(z * z) / (2 * H * H));
+          // #ifndef ISOTHERMAL
+          //           // Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * temp;
+          //           Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * csdisk * csdisk;
+          // #endif
+
+          real rho = pow(Rmin, -1.5) * exp(-(z * z) / (2.0 * H * H));
           real densityFloor = computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
-          if (Vc(RHO, k, j, i) < densityFloor)
-            Vc(RHO, k, j, i) = densityFloor;
+          if (rho < densityFloor) {
+            rho = densityFloor;
+          }
+          Vc(RHO, k, j, i) = rho;
 
 #ifndef ISOTHERMAL
-          // Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * temp;
-          Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * csdisk * csdisk;
+          real temp = Wind::temperature(r, th, epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
+          Vc(PRS, k, j, i) = rho * temp;
 #endif
 
           if (Vc(VX1, k, j, ighost) >= ZERO_F)
@@ -106,7 +114,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
 
 #ifndef DISABLE_MHD
-          Vc(BX3, k, j, i) = 0.0; // Jannaud 2026
+          Vc(BX3, k, j, i) = 0.0; // Jannaud 2026 important
 #endif
         });
 #ifndef DISABLE_MHD

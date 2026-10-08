@@ -6,9 +6,9 @@ using namespace Params;
 namespace Wind {
 
 KOKKOS_INLINE_FUNCTION real window(real R, real z, real Rin, real epsilon, real Hideal, real trSmoothing) {
-  // real R0 = max(R, Rin);
+  real R0 = FMAX(R, Rin);
   // real zh = z / (R0 * epsilon);
-  real zh = z / (R * epsilon);
+  real zh = z / (R0 * epsilon);
   // return tanh((fabs(z) - Hideal * R * epsilon) / trSmoothing);
   return tanh((fabs(zh) - Hideal) / (trSmoothing));
 }
@@ -45,11 +45,11 @@ void Ambipolar(DataBlock &data, real t, IdefixArray3D<real> &xAin) {
           xA(k, j, i) = 1.0 / (Omega * Am * Vc(RHO, k, j, i));
 
         // Kill it at the radial boundaryloop
-        if (x1(i) / Rin < Rin * (1 + waveKillWidth)) {
-          real w = (x1(i) - Rin) / (Rin * waveKillWidth);
+        // if (x1(i) / Rin < Rin * (1 + waveKillWidth)) {
+        //   real w = (x1(i) - Rin) / (Rin * waveKillWidth);
 
-          xA(k, j, i) = xA(k, j, i) * w;
-        }
+        //   xA(k, j, i) = xA(k, j, i) * w;
+        // }
       });
 }
 
@@ -73,7 +73,7 @@ void Resistivity(DataBlock &data, real t, IdefixArray3D<real> &etain) {
         real R = r * sin(x2(j));
         real z = r * cos(x2(j));
 
-        real R0 = max(R, Rin);
+        real R0 = FMAX(R, Rin);
 
         // Buffer region at inner radius. Linear damping.
         real EtaBuffer = etaBuffer0 * epsilon * epsilon * 0.05 * FMAX((1.25 * Rin - r), 0.0); // # [Rin, Rin+0.25R0]
@@ -119,6 +119,7 @@ void MySourceTerm(Hydro *hydro, const real t, const real dtin) {
   real dt = dtin;
   real Hideal = HidealGlob;
   real trSmoothingTemp = trSmoothingTempGlob;
+  real densityFloor0 = densityFloorGlob;
 
   real gamma_m1 = gammaGlob - 1.0;
   real tau0 = tauGlob;
@@ -135,10 +136,105 @@ void MySourceTerm(Hydro *hydro, const real t, const real dtin) {
         real Teff = temperature(r, th, epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
 
         real Ptarget = Teff * Vc(RHO, k, j, i);
-        // real tau = tau0 * (FMIN(pow(R, 1.5), 1.0)); // ???
+        // real tau = tau0 * (FMIN(pow(R, 1.5), 1.0));
         real tau = tau0 * pow(R0, 1.5);
 
-        Uc(ENG, k, j, i) += -dt * (Vc(PRS, k, j, i) - Ptarget) / (tau * gamma_m1);
+        real exp_factor = 1.0 - exp(-dt / tau);
+        real dE_thermal = -(Vc(PRS, k, j, i) - Ptarget) / gamma_m1 * exp_factor; // better?
+        Uc(ENG, k, j, i) += dE_thermal;
+
+        // Uc(ENG, k, j, i) += -dt * (Vc(PRS, k, j, i) - Ptarget) / (tau * gamma_m1);
+
+        // inner shell relaxation
+
+        // real tauVel = tau;
+        // real Tdisk = Teff;
+        // if (R < 1.2) {
+        //   real rhoTarget = 1.0 / (R0 * sqrt(R0)) * exp(1.0 / Tdisk * (1.0 / sqrt(R0 * R0 + z * z) - 1.0 / R0));
+        //   real densityFloor = computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
+        //   if (rhoTarget < densityFloor)
+        //     rhoTarget = densityFloor;
+
+        //   real vx3Target = 1.0 / sqrt(R0) * sqrt(FMAX(R0 / sqrt(R0 * R0 + z * z) - 2.5 * Tdisk, 0.0));
+
+        //   real drho = (Vc(RHO, k, j, i) - rhoTarget) / tauVel;
+        //   real dmx1 = Vc(RHO, k, j, i) * Vc(VX1, k, j, i) / tauVel + Vc(VX1, k, j, i) * drho;
+        //   real dmx2 = Vc(RHO, k, j, i) * Vc(VX2, k, j, i) / tauVel + Vc(VX2, k, j, i) * drho;
+        //   real dmx3 = Vc(RHO, k, j, i) * (Vc(VX3, k, j, i) - vx3Target) / tauVel + Vc(VX3, k, j, i) * drho;
+        //   real deng = Vc(VX1, k, j, i) * dmx1 + Vc(VX2, k, j, i) * dmx2 + Vc(VX3, k, j, i) * dmx3;
+
+        //   Uc(RHO, k, j, i) += -drho * dt;
+        //   Uc(MX1, k, j, i) += -dmx1 * dt;
+        //   Uc(MX2, k, j, i) += -dmx2 * dt;
+        //   Uc(MX3, k, j, i) += -dmx3 * dt;
+        //   Uc(ENG, k, j, i) += -deng * dt;
+        // }
       });
 }
+
+void InternalBoundary(Hydro *hydro, const real t) {
+  auto *data = hydro->data;
+  IdefixArray4D<real> Vc = hydro->Vc;
+  IdefixArray4D<real> Uc = hydro->Uc;
+  IdefixArray1D<real> x1 = data->x[IDIR];
+  IdefixArray1D<real> x2 = data->x[JDIR];
+
+#ifndef DISABLE_MHD
+  real Va_ini_max = 50.0;
+  real Va_fin_max = 8.0;
+  real vAmax = Wind::computeVaMax(4.0, Va_ini_max, Va_fin_max, t);
+#endif
+
+  real densityFloor0 = densityFloorGlob;
+  real Rin = 1.0;
+  real epsilon = epsilonGlob;
+  real epsilonTop = epsilonTopGlob;
+  real Hideal = HidealGlob;
+  real trSmoothingTemp = trSmoothingTempGlob;
+  real gamma_m1 = gammaGlob - 1.0;
+
+  idefix_for(
+      "InternalBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
+        real R = x1(i) * sin(x2(j));
+        real z = x1(i) * cos(x2(j));
+
+        real rho_target = Vc(RHO, k, j, i);
+
+#ifndef DISABLE_MHD
+        real b2 = EXPAND(Vc(BX1, k, j, i) * Vc(BX1, k, j, i), +Vc(BX2, k, j, i) * Vc(BX2, k, j, i), +Vc(BX3, k, j, i) * Vc(BX3, k, j, i));
+        real rho_va = b2 / (vAmax * vAmax);
+        if (rho_va > rho_target) {
+          rho_target = rho_va;
+        }
+#endif
+
+        real densityFloor = Wind::computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
+        if (densityFloor > rho_target) {
+          rho_target = densityFloor;
+        }
+
+        if (rho_target > Vc(RHO, k, j, i)) {
+          Vc(RHO, k, j, i) = rho_target;
+          Uc(RHO, k, j, i) = rho_target; // necessary?
+
+#ifndef ISOTHERMAL
+          real temp = Wind::temperature(x1(i), x2(j), epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
+          Vc(PRS, k, j, i) = temp * rho_target;
+
+          real v2 = Vc(VX1, k, j, i) * Vc(VX1, k, j, i) + Vc(VX2, k, j, i) * Vc(VX2, k, j, i) + Vc(VX3, k, j, i) * Vc(VX3, k, j, i);
+
+          real e_thermal = Vc(PRS, k, j, i) / gamma_m1;
+          real e_kinetic = 0.5 * rho_target * v2;
+
+#ifndef DISABLE_MHD
+          real e_mag = 0.5 * b2;
+          Uc(ENG, k, j, i) = e_thermal + e_kinetic + e_mag;
+#else
+          Uc(ENG, k, j, i) = e_thermal + e_kinetic;
+#endif
+#endif
+        }
+      });
+}
+
 } // namespace Wind

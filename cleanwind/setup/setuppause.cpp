@@ -1,10 +1,10 @@
-#include "setup.hpp"
 #include "../../shared/wind/bc.hpp"
 #include "../../shared/wind/floor.hpp"
 #include "../../shared/wind/ionisation.hpp"
 #include "../../shared/wind/params.hpp"
 #include "dumpImage.hpp"
 #include "idefix.hpp"
+#include "setup.hpp"
 
 using namespace Params;
 
@@ -74,7 +74,7 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   // IdefixHostArray3D<real> eta = variables["eta"];
   IdefixHostArray3D<real> Am = variables["Am"];
 
-  IdefixHostArray3D<real> EPhi = variables["Ephi"];
+  IdefixHostArray3D<real> Ephi = variables["Ephi"];
   // IdefixArray3D<real>::HostMirror scrhHost = Kokkos::create_mirror_view(scrh);
   // Kokkos::deep_copy(scrhHost, scrh);
   // IdefixArray3D<real>::HostMirror scrhHost_eta = Kokkos::create_mirror_view(scrh_eta);
@@ -102,7 +102,7 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
         real Omega = pow(R, -1.5);
 #ifndef DISABLE_MHD
         Am(k, j, i) = 1.0 / (Omega * scrhHost(k, j, i) * Vc(RHO, k, j, i));
-        EPhi(k, j, i) = d.Ex3(k, j, i);
+        Ephi(k, j, i) = d.Ex3(k, j, i);
         // Am(k, j, i) = scrhHost(k, j, i);
         // eta(k, j, i) = scrhHost_eta(k, j, i);
 #endif
@@ -281,15 +281,6 @@ void Setup::InitFlow(DataBlock &data) {
         if (R < Rin) {
           d.Vc(VX3, k, j, i) = R * pow(Rmin, -1.5);
         }
-        // real only_disk = 0.5 * (1 - Wind::window(R, z, epsilonGlob, HidealGlob, trSmoothingGlob));
-        // real exclude_disk = 1 - only_disk;
-        // d.Vc(VX3, k, j, i) = d.Vc(VX3, k, j, i) * only_disk; // better ic?
-
-        // // better ic?
-        // real vz0 = 1.0;
-        // real sign = z < 0.0 ? 1.0 : -1.0;
-        // d.Vc(VX1, k, j, i) = cos(th) * exclude_disk * vz0 * sign;
-        // d.Vc(VX2, k, j, i) = -sin(th) * exclude_disk * vz0 * sign;
 
         real densityFloor = Wind::computeDensityFloor(R, z, densityFloorGlob, Rin, epsilonGlob);
         if (d.Vc(RHO, k, j, i) < densityFloor) {

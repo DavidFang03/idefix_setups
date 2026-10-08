@@ -15,7 +15,7 @@ projectPath = f"{RUNS_FOLDER_PATH}/cleanwind"
 configPath = f"{RUNS_FOLDER_PATH}/AODustyLWind/config.json"
 # task = "cw_20_b1e4"
 # task = "clean_wind_100_v2_b1e4"
-task = "v2_b1e4_iso"
+task = "wind_MHDOFF_iso_transitionSmoothingTemp05"
 runContext = RunContext(
     task,
     projectPath,
@@ -86,10 +86,10 @@ quantities = [
         r"\rho",
         title="Gas density",
         plot_coords=[0, 0],
-        bounds=[1e-10, 1e-2],
+        bounds=[1e-7, 1e-4],
         streamlines=["VX1", "VX2"],
         customize=title,
-        style_kwargs={"cmap": "viridis"},
+        style_kwargs={"cmap": "inferno"},
     ),
     MapMovie2D(
         "vz",
