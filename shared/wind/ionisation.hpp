@@ -18,6 +18,7 @@ void Ambipolar(DataBlock &data, real t, IdefixArray3D<real> &xAin) {
   IdefixArray3D<real> xA = xAin;
   IdefixArray1D<real> x1 = data.x[IDIR];
   IdefixArray1D<real> x2 = data.x[JDIR];
+  IdefixArray1D<real> x3 = data.x[KDIR];
   IdefixArray4D<real> Vc = data.hydro->Vc;
 
   real Hideal = HidealGlob;
@@ -29,9 +30,10 @@ void Ambipolar(DataBlock &data, real t, IdefixArray3D<real> &xAin) {
 
   idefix_for(
       "Ambipolar", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-        real z = x1(i) * cos(x2(j));
         real Rin = ONE_F;
-        real R = FMAX(FABS(x1(i) * sin(x2(j))), Rin);
+        real R = get_R(x1(i), x2(j), x3(k));
+        real z = get_z(x1(i), x2(j), x3(k));
+        R = FMAX(R, Rin);
         real Omega = pow(R, -1.5);
 
         real Am = 2 * AmMid / (1.0 - window(R, z, Rin, epsilon, Hideal, trSmoothing));
@@ -57,6 +59,7 @@ void Resistivity(DataBlock &data, real t, IdefixArray3D<real> &etain) {
   IdefixArray3D<real> eta = etain;
   IdefixArray1D<real> x1 = data.x[IDIR];
   IdefixArray1D<real> x2 = data.x[JDIR];
+  IdefixArray1D<real> x3 = data.x[KDIR];
   IdefixArray4D<real> Vc = data.hydro->Vc;
 
   real epsilon = epsilonGlob;
@@ -69,9 +72,9 @@ void Resistivity(DataBlock &data, real t, IdefixArray3D<real> &etain) {
 
   idefix_for(
       "Resistivity", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-        real r = x1(i);
-        real R = r * sin(x2(j));
-        real z = r * cos(x2(j));
+        real r = get_r(x1(i), x2(j), x3(k));
+        real R = get_R(x1(i), x2(j), x3(k));
+        real z = get_z(x1(i), x2(j), x3(k));
 
         real R0 = FMAX(R, Rin);
 
@@ -91,13 +94,13 @@ void Resistivity(DataBlock &data, real t, IdefixArray3D<real> &etain) {
 }
 #endif
 
-KOKKOS_INLINE_FUNCTION real temperature(real r, real theta, real epsilon, real epsilonTop, real Rin, real Hideal, real trSmoothingTemp) {
-  real z = r * cos(theta);
-  real R = r * sin(theta);
+KOKKOS_INLINE_FUNCTION real temperature(real x1, real x2, real x3, real epsilon, real epsilonTop, real Rin, real Hideal, real trSmoothingTemp) {
+  real R = get_R(x1, x2, x3);
+  real z = get_z(x1, x2, x3);
   real R0 = FMAX(R, Rin);
 
   // return epsilon * epsilon / r;
-  // return epsilon * epsilon / R0;
+  return epsilon * epsilon / R0;
 
   // real Tdisk = epsilon * epsilon / r;
   // real Tcorona = epsilonTop * epsilonTop / r;
@@ -114,6 +117,7 @@ void MySourceTerm(Hydro *hydro, const real t, const real dtin) {
   IdefixArray4D<real> Uc = hydro->Uc;
   IdefixArray1D<real> x1 = data->x[IDIR];
   IdefixArray1D<real> x2 = data->x[JDIR];
+  IdefixArray1D<real> x3 = data->x[KDIR];
   real epsilonTop = epsilonTopGlob;
   real epsilon = epsilonGlob;
   real dt = dtin;
@@ -126,14 +130,12 @@ void MySourceTerm(Hydro *hydro, const real t, const real dtin) {
 
   idefix_for(
       "MySourceTerm", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-        real r = x1(i);
-        real th = x2(j);
-        real z = r * cos(th);
-        real R = r * sin(th);
+        real z = get_z(x1(i), x2(j), x3(k));
+        real R = get_R(x1(i), x2(j), x3(k));
         real Rin = 1.0;
         real R0 = FMAX(R, Rin);
 
-        real Teff = temperature(r, th, epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
+        real Teff = temperature(x1(i), x2(j), x3(k), epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
 
         real Ptarget = Teff * Vc(RHO, k, j, i);
         // real tau = tau0 * (FMIN(pow(R, 1.5), 1.0));
@@ -178,6 +180,7 @@ void InternalBoundary(Hydro *hydro, const real t) {
   IdefixArray4D<real> Uc = hydro->Uc;
   IdefixArray1D<real> x1 = data->x[IDIR];
   IdefixArray1D<real> x2 = data->x[JDIR];
+  IdefixArray1D<real> x3 = data->x[KDIR];
 
 #ifndef DISABLE_MHD
   real Va_ini_max = 50.0;
@@ -195,9 +198,6 @@ void InternalBoundary(Hydro *hydro, const real t) {
 
   idefix_for(
       "InternalBoundary", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-        real R = x1(i) * sin(x2(j));
-        real z = x1(i) * cos(x2(j));
-
         real rho_target = Vc(RHO, k, j, i);
 
 #ifndef DISABLE_MHD
@@ -208,7 +208,7 @@ void InternalBoundary(Hydro *hydro, const real t) {
         }
 #endif
 
-        real densityFloor = Wind::computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
+        real densityFloor = Wind::computeDensityFloor(x1(i), x2(j), x3(k), densityFloor0, Rin, epsilon);
         if (densityFloor > rho_target) {
           rho_target = densityFloor;
         }
@@ -218,7 +218,7 @@ void InternalBoundary(Hydro *hydro, const real t) {
           Uc(RHO, k, j, i) = rho_target; // necessary?
 
 #ifndef ISOTHERMAL
-          real temp = Wind::temperature(x1(i), x2(j), epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
+          real temp = Wind::temperature(x1(i), x2(j), x3(k), epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
           Vc(PRS, k, j, i) = temp * rho_target;
 
           real v2 = Vc(VX1, k, j, i) * Vc(VX1, k, j, i) + Vc(VX2, k, j, i) * Vc(VX2, k, j, i) + Vc(VX3, k, j, i) * Vc(VX3, k, j, i);

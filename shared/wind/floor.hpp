@@ -4,8 +4,11 @@
 using namespace Params;
 
 namespace Wind {
-KOKKOS_INLINE_FUNCTION real computeDensityFloor(real R, real z, real d_floor_0, real Rin, real c0) {
+KOKKOS_INLINE_FUNCTION real computeDensityFloor(real x1, real x2, real x3, real d_floor_0, real Rin, real c0) {
   // return d_floor_0;
+
+  real R = get_R(x1, x2, x3);
+  real z = get_z(x1, x2, x3);
 
   real D_return;
   if (R > Rin) {

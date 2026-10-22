@@ -25,6 +25,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 #endif
   IdefixArray1D<real> x1 = data->x[IDIR];
   IdefixArray1D<real> x2 = data->x[JDIR];
+  IdefixArray1D<real> x3 = data->x[KDIR];
   if ((dir == IDIR) && (side == left)) {
 
     int ighost = data->nghost[IDIR];
@@ -41,14 +42,11 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 
     hydro->boundary->BoundaryFor(
         "UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-          real R = x1(i) * sin(x2(j));
-          real z = x1(i) * cos(x2(j));
+          real R = get_R(x1(i), x2(j), x3(k));
+          real z = get_z(x1(i), x2(j), x3(k));
           real Rmin = FMAX(R, 1.0);
 
           real H = epsilon * Rmin;
-
-          real r = x1(i);
-          real th = x2(j);
 
           //           Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(-(z * z) / (2 * H * H));
           //           real densityFloor = computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
@@ -61,14 +59,14 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           // #endif
 
           real rho = pow(Rmin, -1.5) * exp(-(z * z) / (2.0 * H * H));
-          real densityFloor = computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
+          real densityFloor = computeDensityFloor(x1(i), x2(j), x3(k), densityFloor0, Rin, epsilon);
           if (rho < densityFloor) {
             rho = densityFloor;
           }
           Vc(RHO, k, j, i) = rho;
 
 #ifndef ISOTHERMAL
-          real temp = Wind::temperature(r, th, epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
+          real temp = Wind::temperature(x1(i), x2(j), x3(k), epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
           Vc(PRS, k, j, i) = rho * temp;
 #endif
 
@@ -77,6 +75,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           else
             Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
 
+          Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
           Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
           // Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
           Vc(VX3, k, j, i) = R * Omega0;
@@ -95,8 +94,8 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 
     hydro->boundary->BoundaryFor(
         "UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-          real R = x1(i) * sin(x2(j));
-          real z = x1(i) * cos(x2(j));
+          real R = get_R(x1(i), x2(j), x3(k));
+          real z = get_z(x1(i), x2(j), x3(k));
 
           Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
 
@@ -201,4 +200,5 @@ void EmfBoundary(DataBlock &data, const real t) {
   }
 }
 #endif
+
 } // namespace Wind

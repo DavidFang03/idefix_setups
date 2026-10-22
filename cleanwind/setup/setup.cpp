@@ -28,8 +28,9 @@ std::string reload_path;
 using namespace Params;
 
 void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
-  IdefixArray1D<real> r = data.x[IDIR];
-  IdefixArray1D<real> th = data.x[JDIR];
+  IdefixArray1D<real> x1 = data.x[IDIR];
+  IdefixArray1D<real> x2 = data.x[JDIR];
+  IdefixArray1D<real> x3 = data.x[KDIR];
   real epsilon = epsilonGlob;
   real epsilonTop = epsilonTopGlob;
   real Hideal = HidealGlob;
@@ -37,9 +38,9 @@ void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
   real Rin = 1.0;
   idefix_for(
       "MySoundSpeed", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-        real R = r(i) * sin(th(j));
+        real R = get_R(x1(i), x2(j), x3(k));
         real R0 = FMAX(R, Rin);
-        real temp = Wind::temperature(r(i), th(j), epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
+        real temp = Wind::temperature(x1(i), x2(j), x3(k), epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
         cs(k, j, i) = sqrt(temp);
       });
 }
@@ -68,6 +69,7 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
 
   IdefixHostArray1D<real> x1 = d.x[IDIR];
   IdefixHostArray1D<real> x2 = d.x[JDIR];
+  IdefixHostArray1D<real> x3 = d.x[KDIR];
   IdefixHostArray4D<real> Vc = d.Vc;
   IdefixArray3D<real>::host_mirror_type scrhHost = Kokkos::create_mirror_view(scrh);
   Kokkos::deep_copy(scrhHost, scrh);
@@ -75,9 +77,10 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   for (int k = d.beg[KDIR]; k < d.end[KDIR]; k++) {
     for (int j = d.beg[JDIR]; j < d.end[JDIR]; j++) {
       for (int i = d.beg[IDIR]; i < d.end[IDIR]; i++) {
-        real z = x1(i) * cos(x2(j));
-        real R = FMAX(FABS(x1(i) * sin(x2(j))), ONE_F);
-        real Omega = pow(R, -1.5);
+        real z = get_z(x1(i), x2(j), x3(k));
+        real R = get_R(x1(i), x2(j), x3(k));
+        real R0 = FMAX(R, ONE_F);
+        real Omega = pow(R0, -1.5);
 #ifndef DISABLE_MHD
         Am(k, j, i) = 1.0 / (Omega * scrhHost(k, j, i) * Vc(RHO, k, j, i));
         Ephi(k, j, i) = d.Ex3(k, j, i);
@@ -169,19 +172,22 @@ void Setup::InitFlow(DataBlock &data) {
   for (int k = 0; k < d.np_tot[KDIR]; k++) {
     for (int j = 0; j < d.np_tot[JDIR]; j++) {
       for (int i = 0; i < d.np_tot[IDIR]; i++) {
-        real r = d.x[IDIR](i);
-        real th = d.x[JDIR](j);
-        real R = r * sin(th);
-        real z = r * cos(th);
+        real x1 = d.x[IDIR](i);
+        real x2 = d.x[JDIR](j);
+        real x3 = d.x[KDIR](k);
+
+        real r = get_r(x1, x2, x3);
+        real R = get_R(x1, x2, x3);
+        real z = get_z(x1, x2, x3);
         real Rmin = FMAX(R, Rin);
 
-        real temp = Wind::temperature(r, th, epsilonGlob, epsilonTopGlob, Rin, HidealGlob, trSmoothingTempGlob);
+        real temp = Wind::temperature(x1, x2, x3, epsilonGlob, epsilonTopGlob, Rin, HidealGlob, trSmoothingTempGlob);
 
         real H = epsilonGlob * Rmin;
         d.Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(-(z * z) / (2 * H * H));
 
-        d.Vc(VX1, k, j, i) = ZERO_F;
-        d.Vc(VX2, k, j, i) = ZERO_F;
+        d.Vc(VHOR, k, j, i) = ZERO_F;
+        d.Vc(VVER, k, j, i) = ZERO_F;
 
         // d.Vc(VX3, k, j, i) = 1.0 / sqrt(Rmin) * sqrt(FMAX(Rmin / r - 2.5 * epsilonGlob * epsilonGlob, 0.0));
         // if (R < Rin) {
@@ -191,12 +197,12 @@ void Setup::InitFlow(DataBlock &data) {
         real vphi_edge = 1.0 / sqrt(Rin) * sqrt(FMAX(Rin / r - 2.5 * epsilonGlob * epsilonGlob, 0.0));
 
         if (R >= Rin) {
-          d.Vc(VX3, k, j, i) = 1.0 / sqrt(R) * sqrt(FMAX(R / r - 2.5 * epsilonGlob * epsilonGlob, 0.0));
+          d.Vc(VPHI, k, j, i) = 1.0 / sqrt(R) * sqrt(FMAX(R / r - 2.5 * epsilonGlob * epsilonGlob, 0.0));
         } else {
-          d.Vc(VX3, k, j, i) = (R / Rin) * vphi_edge; // Continuous solid body rotation
+          d.Vc(VPHI, k, j, i) = (R / Rin) * vphi_edge; // Continuous solid body rotation
         }
 
-        real densityFloor = Wind::computeDensityFloor(R, z, densityFloorGlob, Rin, epsilonGlob);
+        real densityFloor = Wind::computeDensityFloor(x1, x2, x3, densityFloorGlob, Rin, epsilonGlob);
         if (d.Vc(RHO, k, j, i) < densityFloor) {
           d.Vc(RHO, k, j, i) = densityFloor;
         }
@@ -213,21 +219,23 @@ void Setup::InitFlow(DataBlock &data) {
   for (int k = 0; k < d.np_tot[KDIR]; k++) {
     for (int j = 0; j < d.np_tot[JDIR]; j++) {
       for (int i = 0; i < d.np_tot[IDIR]; i++) {
-        real r = d.x[IDIR](i);
-        real th = d.x[JDIR](j);
-        real z = r * cos(th);
-        real R = r * sin(th);
+        real x1 = d.x[IDIR](i);
+        real x2 = d.x[JDIR](j);
+
+        // real r = get_r(x1, x2);
+        real R = get_R(x1, x2, x3);
+        real z = get_z(x1, x2, x3);
 
         real m = -5.0 / 4.0;
         real B0 = epsilonGlob * sqrt(2.0 / betaGlob);
 
-        A(IDIR, k, j, i) = ZERO_F;
-        A(JDIR, k, j, i) = ZERO_F;
+        A(HOR, k, j, i) = ZERO_F;
+        A(VER, k, j, i) = ZERO_F;
 
         if (R > Rin) {
-          A(KDIR, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0) + Rin * Rin / (2.0 * R));
+          A(PHIDIR, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0) + Rin * Rin / (2.0 * R));
         } else {
-          A(KDIR, k, j, i) = B0 * R / 2.0;
+          A(PHIDIR, k, j, i) = B0 * R / 2.0;
         }
       }
     }
