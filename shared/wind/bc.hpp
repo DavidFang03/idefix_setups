@@ -2,6 +2,7 @@
 
 #include "../../shared/wind/params.hpp"
 #include "floor.hpp"
+#include "ic.hpp"
 #include "ionisation.hpp"
 
 using namespace Params;
@@ -29,40 +30,16 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
   if ((dir == IDIR) && (side == left)) {
 
     int ighost = data->nghost[IDIR];
-    real Rin = 1.0;
-    real cscorona = epsilonTopGlob / sqrt(Rin);
+    real Rin = RinGlob;
     real epsilon = epsilonGlob;
     real trSmoothingTemp = trSmoothingTempGlob;
     real epsilonTop = epsilonTopGlob;
     real Hideal = HidealGlob;
     real densityFloor0 = densityFloorGlob;
 
-    real Omega0 = 1.0;
-    real csdisk = epsilonGlob / sqrt(Rin);
-
     hydro->boundary->BoundaryFor(
         "UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-          real R = get_R(x1(i), x2(j), x3(k));
-          real z = get_z(x1(i), x2(j), x3(k));
-          real Rmin = FMAX(R, 1.0);
-
-          real H = epsilon * Rmin;
-
-          //           Vc(RHO, k, j, i) = pow(Rmin, -1.5) * exp(-(z * z) / (2 * H * H));
-          //           real densityFloor = computeDensityFloor(R, z, densityFloor0, Rin, epsilon);
-          //           if (Vc(RHO, k, j, i) < densityFloor)
-          //             Vc(RHO, k, j, i) = densityFloor;
-
-          // #ifndef ISOTHERMAL
-          //           // Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * temp;
-          //           Vc(PRS, k, j, i) = Vc(RHO, k, j, i) * csdisk * csdisk;
-          // #endif
-
-          real rho = pow(Rmin, -1.5) * exp(-(z * z) / (2.0 * H * H));
-          real densityFloor = computeDensityFloor(x1(i), x2(j), x3(k), densityFloor0, Rin, epsilon);
-          if (rho < densityFloor) {
-            rho = densityFloor;
-          }
+          real rho = Wind::density_initial(x1(i), x2(j), x3(k), epsilon, Rin, densityFloor0);
           Vc(RHO, k, j, i) = rho;
 
 #ifndef ISOTHERMAL
@@ -75,10 +52,10 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           else
             Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
 
-          Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
+          // Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
           Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
-          // Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
-          Vc(VX3, k, j, i) = R * Omega0;
+          Vc(VX3, k, j, i) = Wind::vphi_initial(x1(i), x2(j), x3(k), epsilon, Rin);
+
 #ifndef DISABLE_MHD
           Vc(BX3, k, j, i) = -Vc(BX3, k, j, 2 * ighost - i - 1);
 #endif
@@ -94,9 +71,6 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 
     hydro->boundary->BoundaryFor(
         "UserDefX1", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-          real R = get_R(x1(i), x2(j), x3(k));
-          real z = get_z(x1(i), x2(j), x3(k));
-
           Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
 
 #ifndef ISOTHERMAL
@@ -107,7 +81,6 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
           else
             Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
 
-          // Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
           Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
 
           Vc(VX3, k, j, i) = Vc(VX3, k, j, ighost);
@@ -120,62 +93,35 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
     hydro->boundary->BoundaryForX2s("UserDefX2s", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX2s, k, j, i) = Vs(BX2s, k, j, ighost); });
 #endif
   }
+
   if (dir == JDIR) {
-
-    const int j_beg = data->beg[JDIR];
-    const int j_end = data->end[JDIR];
-
+    int j_ghost;
     if (side == left) {
-      idefix_for(
-          "UserDefX2_Left_Vc", 0, data->np_tot[KDIR], 0, j_beg, 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-            const int jrefl = 2 * j_beg - 1 - j;
-            Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
-
-#ifndef ISOTHERMAL
-            Vc(PRS, k, j, i) = Vc(PRS, k, jrefl, i);
-#endif
-            Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
-            Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
-            Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
-        // Vc(VX3, k, j, i) = ZERO_F;
-#ifndef DISABLE_MHD
-            Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i); // https://github.com/idefix-code/idefix/issues/203
-#endif
-          });
-
-#ifndef DISABLE_MHD
-      hydro->boundary->BoundaryForX1s(
-          "UserDefX1_Left_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-            const int jrefl = 2 * j_beg - 1 - j;
-            Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
-          });
-#endif
+      j_ghost = data->beg[JDIR];
     } else if (side == right) {
-      idefix_for(
-          "UserDefX2_Right_Vc", 0, data->np_tot[KDIR], j_end, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-            const int jrefl = 2 * j_end - 1 - j;
-            Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
+      j_ghost = data->beg[JDIR];
+    }
+    const int jrefl = 2 * j_ghost - 1;
+
+    hydro->boundary->BoundaryFor(
+        "UserDefX2", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
+          Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
+
 #ifndef ISOTHERMAL
-            Vc(PRS, k, j, i) = Vc(PRS, k, jrefl, i);
+          Vc(PRS, k, j, i) = Vc(PRS, k, jrefl, i);
 #endif
-            Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
-            Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
-            Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
-        // Vc(VX3, k, j, i) = ZERO_F;
+          Vc(VX1, k, j, i) = Vc(VX1, k, jrefl, i);
+          Vc(VX2, k, j, i) = -Vc(VX2, k, jrefl, i);
+          Vc(VX3, k, j, i) = -Vc(VX3, k, jrefl, i);
+#ifndef DISABLE_MHD
+          Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i); // https://github.com/idefix-code/idefix/issues/203
+#endif
+        });
 
 #ifndef DISABLE_MHD
-            Vc(BX3, k, j, i) = -Vc(BX3, k, jrefl, i);
+    hydro->boundary->BoundaryForX1s("UserDefX1s", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i); });
 #endif
-          });
-#ifndef DISABLE_MHD
-      hydro->boundary->BoundaryForX1s(
-          "UserDefX1_Right_Vs", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-            const int jrefl = 2 * j_end - 1 - j;
-            Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
-          });
-#endif
-    }
-  }
+  };
 }
 
 #ifndef DISABLE_MHD

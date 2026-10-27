@@ -1,7 +1,7 @@
 #pragma once
 
 namespace Params {
-inline real alphaGlob;
+inline real RinGlob;
 inline real gammaGlob;
 inline real tauGlob;
 inline real epsilonGlob;
