@@ -56,6 +56,51 @@ void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
       });
 }
 
+void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
+  auto *data = hydro->data;
+  IdefixArray4D<real> Vc = hydro->Vc;
+  IdefixArray1D<real> x1 = data->x[IDIR];
+  IdefixArray1D<real> x2 = data->x[JDIR];
+  IdefixArray1D<real> x3 = data->x[KDIR];
+  real epsilon = epsilonGlob;
+  real Rin = RinGlob;
+  real densityFloor0 = densityFloorGlob;
+  if (dir == IDIR) {
+
+    // int ighost;
+    // if (side == left) {
+    //   ighost = data->beg[IDIR];
+    // } else if (side == right) {
+    //   ighost = data->end[IDIR] - 1;
+    // }
+
+    hydro->boundary->BoundaryFor(
+        "UserDefBoundary", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
+          Vc(RHO, k, j, i) = Wind::density_initial(x1(i), x2(j), x3(k), epsilon, Rin, densityFloor0);
+          Vc(VX1, k, j, i) = ZERO_F;
+          Vc(VX2, k, j, i) = ZERO_F;
+          Vc(VX3, k, j, i) = Wind::vphi_initial(x1(i), x2(j), x3(k), epsilon, Rin);
+        });
+  }
+
+  if (dir == JDIR) {
+    // int jghost;
+    // if (side == left) {
+    //   jghost = data->beg[JDIR];
+    // } else if (side == right) {
+    //   jghost = data->end[JDIR] - 1;
+    // }
+
+    hydro->boundary->BoundaryFor(
+        "UserDefBoundary", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
+          Vc(RHO, k, j, i) = Wind::density_initial(x1(i), x2(j), x3(k), epsilon, Rin, densityFloor0);
+          Vc(VX1, k, j, i) = ZERO_F;
+          Vc(VX2, k, j, i) = ZERO_F;
+          Vc(VX3, k, j, i) = Wind::vphi_initial(x1(i), x2(j), x3(k), epsilon, Rin);
+        });
+  }
+}
+
 void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
 
   // Use Invdt as scratch array
@@ -85,10 +130,12 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   IdefixHostArray4D<real> Vc = d.Vc;
   IdefixArray3D<real>::host_mirror_type scrhHost = Kokkos::create_mirror_view(scrh);
   Kokkos::deep_copy(scrhHost, scrh);
+
+  IdefixHostArray3D<real> cs = variables["cs"];
+
 #ifdef ISOTHERMAL
   IdefixArray3D<real> scrh_cs("Scratch_cs", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
   MySoundSpeed(data, data.t, scrh_cs);
-  IdefixHostArray3D<real> cs = variables["cs"];
   IdefixArray3D<real>::host_mirror_type scrhHost_cs = Kokkos::create_mirror_view(scrh_cs);
   Kokkos::deep_copy(scrhHost_cs, scrh_cs);
 #endif
@@ -107,61 +154,11 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
         InvDt(k, j, i) = d.InvDt(k, j, i);
 #ifdef ISOTHERMAL
         cs(k, j, i) = scrhHost_cs(k, j, i);
+#else
+        cs(k, j, i) = sqrt(gammaGlob * d.Vc(PRS, k, j, i) / d.Vc(RHO, k, j, i));
 #endif
       }
     }
-  }
-}
-
-void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
-  auto *data = hydro->data;
-  IdefixArray4D<real> Vc = hydro->Vc;
-  IdefixArray1D<real> x1 = data->x[IDIR];
-  IdefixArray1D<real> x2 = data->x[JDIR];
-  real epsilon = epsilonGlob;
-  if (dir == IDIR) {
-
-    int ighost;
-    if (side == left) {
-      ighost = data->beg[IDIR];
-    } else if (side == right) {
-      ighost = data->end[IDIR] - 1;
-    }
-
-    hydro->boundary->BoundaryFor(
-        "UserDefBoundary", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-          real R = x1(i) * sin(x2(j));
-          real z = x1(i) * cos(x2(j));
-          real Vk = 1.0 / sqrt(R);
-          real cs2 = (epsilon * Vk) * (epsilon * Vk);
-
-          Vc(RHO, k, j, i) = 1.0 / (R * sqrt(R)) * exp(1.0 / (cs2) * (1 / x1(i) - 1 / R));
-          Vc(VX1, k, j, i) = Vc(VX1, k, j, ighost);
-          Vc(VX2, k, j, i) = Vc(VX2, k, j, ighost);
-          Vc(VX3, k, j, i) = Vk * sqrt(R / x1(i) - 2.5 * epsilon * epsilon);
-        });
-  }
-
-  if (dir == JDIR) {
-    int jghost;
-    if (side == left) {
-      jghost = data->beg[JDIR];
-    } else if (side == right) {
-      jghost = data->end[JDIR] - 1;
-    }
-
-    hydro->boundary->BoundaryFor(
-        "UserDefBoundary", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
-          real R = x1(i) * sin(x2(j));
-          real z = x1(i) * cos(x2(j));
-          real Vk = 1.0 / sqrt(R);
-          real cs2 = (epsilon * Vk) * (epsilon * Vk);
-
-          Vc(RHO, k, j, i) = 1.0 / (R * sqrt(R)) * exp(1.0 / (cs2) * (1 / x1(i) - 1 / R));
-          Vc(VX1, k, j, i) = Vc(VX1, k, jghost, i);
-          Vc(VX2, k, j, i) = ZERO_F;
-          Vc(VX3, k, j, i) = Vk * sqrt(R / x1(i) - 2.5 * epsilon * epsilon);
-        });
   }
 }
 
@@ -170,10 +167,7 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
 // Initialisation routine. Can be used to allocate
 // Arrays or variables which are used later on
 Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
-  // Set the function for userdefboundary
-  // data.hydro->EnrollUserDefBoundary(&UserdefBoundary);
   data.hydro->EnrollUserDefBoundary(&Wind::UserdefBoundary);
-
   data.hydro->EnrollInternalBoundary(&Wind::InternalBoundary);
 
 #ifndef ISOTHERMAL
@@ -249,16 +243,7 @@ void Setup::InitFlow(DataBlock &data) {
         real x2 = d.x[JDIR](j);
         real x3 = d.x[KDIR](k);
 
-        // real r = get_r(x1, x2, x3);
-        // real R = get_R(x1, x2, x3);
-        // real z = get_z(x1, x2, x3);
-        // real Rmin = FMAX(R, Rin);
-        // real Vk = 1.0 / sqrt(R);
-        // real cs2 = (epsilonGlob * Vk) * (epsilonGlob * Vk);
-        // d.Vc(RHO, k, j, i) = 1.0 / (R * sqrt(R)) * exp(1.0 / (cs2) * (1 / r - 1 / R));
-
         d.Vc(RHO, k, j, i) = Wind::density_initial(x1, x2, x3, epsilonGlob, Rin, densityFloorGlob);
-        // d.Vc(VX3, k, j, i) = Vk * sqrt(R / r - 2.5 * epsilonGlob * epsilonGlob);
 
         d.Vc(VHOR, k, j, i) = ZERO_F;
         d.Vc(VVER, k, j, i) = ZERO_F;
@@ -284,13 +269,10 @@ void Setup::InitFlow(DataBlock &data) {
       for (int i = 0; i < d.np_tot[IDIR]; i++) {
         real x1 = d.x[IDIR](i);
         real x2 = d.x[JDIR](j);
+        real x3 = d.x[KDIR](k);
 
-        // real r = get_r(x1, x2);
         real R = get_R(x1, x2, x3);
         real z = get_z(x1, x2, x3);
-
-        real m = -5.0 / 4.0;
-        real B0 = epsilonGlob * sqrt(2.0 / betaGlob);
 
         A(HOR, k, j, i) = ZERO_F;
         A(VER, k, j, i) = ZERO_F;

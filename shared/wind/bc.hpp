@@ -99,12 +99,12 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
     if (side == left) {
       j_ghost = data->beg[JDIR];
     } else if (side == right) {
-      j_ghost = data->beg[JDIR];
+      j_ghost = data->end[JDIR];
     }
-    const int jrefl = 2 * j_ghost - 1;
 
     hydro->boundary->BoundaryFor(
         "UserDefX2", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
+          const int jrefl = 2 * j_ghost - j - 1;
           Vc(RHO, k, j, i) = Vc(RHO, k, jrefl, i);
 
 #ifndef ISOTHERMAL
@@ -119,7 +119,11 @@ void UserdefBoundary(Hydro *hydro, int dir, BoundarySide side, real t) {
         });
 
 #ifndef DISABLE_MHD
-    hydro->boundary->BoundaryForX1s("UserDefX1s", dir, side, KOKKOS_LAMBDA(int k, int j, int i) { Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i); });
+    hydro->boundary->BoundaryForX1s(
+        "UserDefX1s", dir, side, KOKKOS_LAMBDA(int k, int j, int i) {
+          const int jrefl = 2 * j_ghost - j - 1;
+          Vs(BX1s, k, j, i) = Vs(BX1s, k, jrefl, i);
+        });
 #endif
   };
 }

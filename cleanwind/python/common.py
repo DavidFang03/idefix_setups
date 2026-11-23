@@ -29,20 +29,20 @@ def float_to_latex(num: float) -> str:
     return f"{mantissa:.2} \\cdot 10^{{{exponent}}}"
 
 
-def plasmabeta(v):
-    P = v.data["PRS"]
-    B2 = v.data["BX1"] ** 2 + v.data["BX2"] ** 2 + v.data["BX3"] ** 2
+def plasmabeta(ds):
+    P = ds["PRS"].data
+    B2 = ds["BX1"].data ** 2 + ds["BX2"].data ** 2 + ds["BX3"].data ** 2
     return 8 * np.pi * P / B2
 
 
 class WindyDisk:
-    def __init__(self, inidata, gridInfo, r=50):
+    def __init__(self, inidata, grid, r=50):
         """
         Accretion rate at radius r
         """
         self.inidata = inidata
         self.r = r
-        self.gridInfo = gridInfo
+        self.grid = grid
 
         Hideal = self.inidata["Setup"]["Hideal"]
         epsilon = self.inidata["Setup"]["epsilon"]
@@ -63,9 +63,9 @@ class WindyDisk:
 
     #     thetatop = np.pi / 2 - np.atan(Hideal * epsilon)
     #     thetabottom = np.pi / 2 + np.atan(Hideal * epsilon)
-    #     jm = np.searchsorted(v.theta, thetatop)
-    #     jp = np.searchsorted(v.theta, thetabottom)
-    #     i = np.searchsorted(v.r, self.r)
+    #     jm = np.searchsorted(self.grid.X2_med, thetatop)
+    #     jp = np.searchsorted(self.grid.X2_med, thetabottom)
+    #     i = np.searchsorted(self.grid.X1_med, self.r)
 
     #     mloss = 4*np.pi*self.r**2 *  np.sum(rho[jm:jp, :] * vr[jm:jp, :] * dR)
 
@@ -74,7 +74,7 @@ class WindyDisk:
     #     return macc
 
     def temperature(self, v):
-        return v.data["PRS"] / v.data["RHO"]
+        return v["PRS"].data / v["RHO"].data
 
     def Macc(self, v):
         """
@@ -82,14 +82,14 @@ class WindyDisk:
         """
 
         thetatop, thetabottom = self.thetatop, self.thetabottom
-        jm = np.searchsorted(v.theta, thetatop)
-        jp = np.searchsorted(v.theta, thetabottom)
-        i = np.searchsorted(v.r, self.r)
+        jm = np.searchsorted(self.grid.X2_med, thetatop)
+        jp = np.searchsorted(self.grid.X2_med, thetabottom)
+        i = np.searchsorted(self.grid.X1_med, self.r)
 
-        rho = v.data["RHO"][jm:jp, i]
-        vr = v.data["VX1"][jm:jp, i]
-        dtheta = np.diff(v.thetal)[jm:jp]
-        theta = v.theta[jm:jp]
+        rho = v["RHO"].data[i, jm:jp]
+        vr = v["VX1"].data[i, jm:jp]
+        dtheta = np.diff(self.grid.X2)[jm:jp]
+        theta = self.grid.X2_med[jm:jp]
 
         macc = -2 * np.pi * self.r**2 * np.sum(np.sin(theta) ** 2 * rho * vr * dtheta)
 
@@ -100,23 +100,25 @@ class WindyDisk:
         (Roberts & Latter 2026 Eq. 23) to obtain Fig A1.
         = Flux threading the midplane. Therefore, r=R.
         """
+        r0 = self.grid.X1[0]
+        jmid = np.searchsorted(self.grid.X2_med, np.pi / 2)
 
-        r0 = v.r[0]
+        br = np.squeeze(v["BX1"].data)
+        btheta = np.squeeze(v["BX2"].data)
+        dr = np.diff(self.grid.X1)
+        dtheta = np.diff(self.grid.X2)
+        theta = self.grid.X2_med
 
-        jmid = np.searchsorted(v.theta, np.pi / 2)
-
-        br = v.data["BX1"]
-        btheta = v.data["BX2"]
-        dr = np.diff(v.rl)
-        dtheta = np.diff(v.thetal)
-        theta = v.theta
-
-        lhs = r0**2 * np.sum(
-            np.sin(theta)[:jmid, None] * br[:jmid, 0] * dtheta[:jmid, None]
-        )
+        lhs = r0**2 * np.sum(np.sin(theta[:jmid]) * br[0, :jmid] * dtheta[:jmid])
+        btheta_eq = 0.5 * (btheta[:, jmid - 1] + btheta[:, jmid])
         rhs = []
-        for i, r in enumerate(v.r):
-            rhs.append(-np.sum(v.r[0:i] * btheta[jmid, 0:i] * dr[0:i]))
+        for i, r in enumerate(self.grid.X1_med):
+            rhs.append(
+                -(
+                    np.sum(self.grid.X1_med[0:i] * btheta_eq[0:i] * dr[0:i])
+                    + r * btheta_eq[i] * (r - self.grid.X1[i])
+                )
+            )
 
         psi = lhs + np.asarray(rhs)
         return psi
@@ -128,14 +130,14 @@ class WindyDisk:
         # To get a cylindrical grid I interpolate
         Sigma_list = [np.nan] * inner_excluded
         interp = RegularGridInterpolator(
-            (v.r, v.theta),
-            v.data["RHO"].T,
+            (self.grid.X1_med, self.grid.X2_med),
+            v["RHO"].data,
             fill_value=np.nan,
             bounds_error=False,
         )
 
         # Evaluate for a cylindrical grid R, z
-        for R in v.r[inner_excluded:]:
+        for R in self.grid.X1_med[inner_excluded:]:
             z0 = self.epsilon * self.Hideal * R
             dz = 2 * z0 / 128
             z = np.arange(-z0, z0, dz)  # fuck it
@@ -150,8 +152,8 @@ class WindyDisk:
 
     def vz(self, v):
         return (
-            np.cos(v.theta[:, None]) * v.data["VX1"]
-            - np.sin(v.theta[:, None]) * v.data["VX2"]
+            np.cos(self.grid.X2_med[:, None]) * v["VX1"].data
+            - np.sin(self.grid.X2_med[:, None]) * v["VX2"].data
         )
 
     def vz_c(self, v):
@@ -159,19 +161,19 @@ class WindyDisk:
         along cylindrical radius
         """
         interp_vr = RegularGridInterpolator(
-            (v.r, v.theta),
-            v.data["VX1"].T,
+            (self.grid.X1_med, self.grid.X2_med),
+            np.squeeze(v["VX1"].data),
             fill_value=np.nan,
             bounds_error=False,
         )
         interp_vtheta = RegularGridInterpolator(
-            (v.r, v.theta),
-            v.data["VX2"].T,
+            (self.grid.X1_med, self.grid.X2_med),
+            np.squeeze(v["VX2"].data),
             bounds_error=False,
             fill_value=np.nan,  # some part at the outer edge will be excluded.
         )
 
-        R = v.r
+        R = self.grid.X1_med
         z0 = self.epsilon * self.Hideal * R
         theta0 = np.pi / 2 - np.arctan2(z0, R)
         r0 = np.sqrt(R**2 + z0**2)
@@ -183,12 +185,12 @@ class WindyDisk:
 
     def rho_c(self, v):
         interp_rho = RegularGridInterpolator(
-            (v.r, v.theta),
-            v.data["RHO"].T,
+            (self.grid.X1_med, self.grid.X2_med),
+            np.squeeze(v["RHO"].data),
             bounds_error=False,
             fill_value=np.nan,  # some part at the outer edge will be excluded.
         )
-        R = v.r
+        R = self.grid.X1_med
         z0 = self.epsilon * self.Hideal * R
         theta0 = np.pi / 2 - np.arctan2(z0, R)
         r0 = np.sqrt(R**2 + z0**2)
@@ -205,40 +207,40 @@ class WindyDisk:
         function of R (cylindrical). Thus constant for self-similar model.
         """
 
-        OmegaK = v.r ** (-1.5)
+        OmegaK = self.grid.X1_med ** (-1.5)
         zetap = self.rho_c(v) * self.vz_c(v) / (np.asarray(self.Sigma(v)) * OmegaK)
-        return zetap
+        return np.astype(zetap, np.float32)  # wtf??
 
     def time(self, v):
-        return v.t[0] * np.ones(len(v.r))
+        return v.t[0] * np.ones(len(self.grid.X1_med))
 
     def totalmass(self, v):
-        dr = np.diff(v.rl)
-        dtheta = np.diff(v.thetal)
-        return np.sum(v.data["RHO"] * v.r * dtheta[:, None] * dr)
+        dr = np.diff(self.grid.X1)
+        dtheta = np.diff(self.grid.X2)
+        return np.sum(v["RHO"].data * self.grid.X1_med * dtheta[:, None] * dr)
 
     def midplane_beta(self, v):
-        jmid = np.searchsorted(v.theta, np.pi / 2)
+        jmid = np.searchsorted(self.grid.X2_med, np.pi / 2)
         return plasmabeta(v)[jmid, :]
 
     def bz(self, v):
         return (
-            np.cos(v.theta[:, None]) * v.data["BX1"]
-            - np.sin(v.theta[:, None]) * v.data["BX2"]
+            np.cos(self.grid.X2_med[:, None]) * v["BX1"].data
+            - np.sin(self.grid.X2_med[:, None]) * v["BX2"].data
         )
 
     def bz_midplane(self, v):
-        jmid = np.searchsorted(v.theta, np.pi / 2)
+        jmid = np.searchsorted(self.grid.X2_med, np.pi / 2)
         return self.bz(v)[jmid, :]
 
     def Ephi_midplane(self, v):
-        jmid = np.searchsorted(v.theta, np.pi / 2)
-        return v.data["Ephi"][jmid, :]
+        jmid = np.searchsorted(self.grid.X2_med, np.pi / 2)
+        return v["EPHI".data][jmid, :]
 
     def vB(self, v):
         """
         Not time averaged
         """
-        jmid = np.searchsorted(v.theta, np.pi / 2)
+        jmid = np.searchsorted(self.grid.X2_med, np.pi / 2)
         Bz = self.bz(v)
-        return v.data["Ephi"][jmid, :] / Bz[jmid, :]
+        return v["EPHI".data][jmid, :] / Bz[jmid, :]

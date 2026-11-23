@@ -1,5 +1,6 @@
 #define COMPONENTS 3
-#define DIMENSIONS 3
-#define GEOMETRY POLAR
+#define DIMENSIONS 2
+#define GEOMETRY SPHERICAL
 #define SMALL_PRESSURE_TEMPERATURE (0.05)
-#define DISABLE_MHD
+#define CORONA
+// #define RELOAD

@@ -1,53 +1,48 @@
-from idefix2python import (
-    RunContext,
-    Pipeline,
-    MapMovie2D,
-    Fig,
-    OneComponentOneVariable,
-    SpaceTimeHeatmap,
-    LineMovie1D,
-)
-import numpy as np
-from common import float_to_latex, plasmabeta, WindyDisk
 import matplotlib.pyplot as plt
+import numpy as np
+from appl import (
+    Context,
+    Fig,
+    LineMovie1D,
+    MapMovie2D,
+    Pipeline,
+    SpaceTimeHeatmap,
+)
+from common import WindyDisk, float_to_latex, plasmabeta
 
-discrete_cmap = plt.get_cmap("turbo_r").resampled(30)
+discrete_cmap = plt.get_cmap("turbo_r").resampled(40)
 
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind"
-configPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/AODustyLWind/config.json"
-# task = "clean_wind_100_v2_b1e4"
-task = "reload_0502_100_b1e4"
+task = "hr_b1e3"
 
 
-runContext = RunContext(
+runContext = Context(
     task,
     projectPath,
-    configPath=configPath,
     custom_name="vB",
 )
 
-wd = WindyDisk(runContext.inidata, runContext.gridInfo)
+wd = WindyDisk(runContext.inidata, runContext.grid)
 
 
 eps = float(runContext.inidata["Setup"]["epsilon"])
 betamid = float(runContext.inidata["Setup"]["beta"])
 densityFloor = float(runContext.inidata["Setup"]["densityFloor"])
 
-RLine = runContext.gridInfo.X1Line
-Rgrid = runContext.gridInfo.grid1
+RLine = runContext.grid.X1
 
 
-def title(ax, v):
+def title(ax, v, nb):
     fig = ax.get_figure()
-    fig.suptitle(rf"$t={float_to_latex(v.t[0] / (2 * np.pi))}$ yr")
+    fig.suptitle(rf"$t={float_to_latex(runContext.times_all[nb] / (2 * np.pi))}$ yr")
 
 
-def totaddmass(v):
-    dr, dtheta = np.meshgrid(np.diff(v.rl), np.diff(v.thetal))
-    return np.sum(v.data["addedMass"] * Rgrid * dr * dtheta)
+# def totaddmass(v):
+#     dr, dtheta = np.meshgrid(np.diff(v.rl), np.diff(v.thetal))
+#     return np.sum(v.data["addedMass"] * Rgrid * dr * dtheta)
 
 
-def grid(ax, v):
+def grid(ax, v, on):
     ax.grid()
 
 
@@ -163,13 +158,14 @@ quantities = [
 quantities = [
     MapMovie2D(
         "RHO",
-        r"\rho",
+        r"$\rho$",
         title="Gas density",
         plot_coords=[0, 0],
         streamlines=["VX1", "VX2"],
         customize=title,
         bounds=[densityFloor, 1e-4],
         style_kwargs={"cmap": "inferno"},
+        norm="log",
         # xmax=10,
         # ymin=-10,
         # ymax=10,
@@ -201,30 +197,32 @@ quantities = [
         "Psimid",
         r"$\Psi_\mathrm{mid}(R,t)$",
         title="Magnetic flux",
-        plot_coords=[0, 4],
+        plot_coords=[0, 0],
         compute=wd.flux_function,
         # xqty=wd.RLine,
+        xmax=10,
+        # norm="log",
         rotate=True,
-        # compute=wd.flux_function,
-        # bounds=[0, 0.005],
+        bounds=[0, 2e-2],
         style_kwargs={"cmap": discrete_cmap},
         # xmax=10,
     ),
-    LineMovie1D(
-        "Bz0",
-        r"$B_z(R,\pi/2)$",
-        title="Midplane $B_z$",
-        plot_coords=[0, 3],
-        compute=wd.bz_midplane,
-        xlabel="$R$",
-        yscale="log",
-        ymin=1e-6,
-        ymax=1e-3,
-    ),
+    # LineMovie1D(
+    #     "Bz0",
+    #     r"$B_z(R,\pi/2)$",
+    #     title="Midplane $B_z$",
+    #     plot_coords=[0, 3],
+    #     compute=wd.bz_midplane,
+    #     xlabel="$R$",
+    #     yscale="log",
+    #     ymin=1e-6,
+    #     ymax=1e-3,
+    # ),
 ]
-fig1 = Fig(quantities)
 
+fig1 = Fig([quantities[-1]])
 
-pipeline = Pipeline(runContext, [fig1])
+if __name__ == "__main__":
+    pipeline = Pipeline(runContext, [fig1])
 
-pipeline.run()
+    pipeline.run()
