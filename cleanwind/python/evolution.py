@@ -1,125 +1,114 @@
-from idefix2python import RunContext, Pipeline, MapMovie2D, Fig
-import numpy as np
-import matplotlib
-from common import WindyDisk
 import os
-from dotenv import load_dotenv
+import numpy as np
 
-load_dotenv()
-
-matplotlib.use("pdf")
+import appl
 
 RUNS_FOLDER_PATH = str(os.getenv("RUNS_FOLDER_PATH"))
-print(RUNS_FOLDER_PATH)
-projectPath = f"{RUNS_FOLDER_PATH}/cleanwind"
-configPath = f"{RUNS_FOLDER_PATH}/AODustyLWind/config.json"
-# task = "cw_20_b1e4"
-# task = "clean_wind_100_v2_b1e4"
-task = "lr_wind_v8_MHDOFF_b1e4"
-runContext = RunContext(
-    task,
-    projectPath,
-    configPath=configPath,
-    # pdf_mode=True,
+
+project = "cleanwind"
+runName = "mr_relax_b1e3"
+
+runContext = appl.Context(
+    runName=runName,
+    projectPath=f"{RUNS_FOLDER_PATH}/{project}",
+    code="idefix",
 )
-
-eps = 0.05
-betamid = float(runContext.inidata["Setup"]["beta"])
-wd = WindyDisk(runContext.inidata, runContext.gridInfo)
-
-
-def float_to_latex(num: float) -> str:
-    """
-    Converts a float (including scientific notation like 4e3)
-    into a LaTeX formatted string.
-    """
-    if num == 0:
-        return "0"
-
-    # Get the base-10 exponent and the mantissa
-    exponent = int(np.floor(np.log10(abs(num))))
-    mantissa = num / (10**exponent)
-
-    # Clean up trailing zeros or convert float integers (like 4.0 to 4)
-    mantissa = int(mantissa) if mantissa.is_integer() else round(mantissa, 4)
-
-    # If the mantissa is exactly 1, we usually just write 10^x instead of 1 \cdot 10^x
-    if mantissa == 1:
-        return f"10^{{{exponent}}}"
-    if mantissa == -1:
-        return f"-10^{{{exponent}}}"
-
-    # Format as a LaTeX inline np string
-    return f"{mantissa:.2} \\cdot 10^{{{exponent}}}"
 
 
 def plasmabeta(v):
-    P = v.data["PRS"]
-    B2 = v.data["BX1"] ** 2 + v.data["BX2"] ** 2 + v.data["BX3"] ** 2
+    P = v["PRS"].data
+    B2 = v["BX1"].data ** 2 + v["BX2"].data ** 2 + v["BX3"].data ** 2
     return 8 * np.pi * P / B2
 
 
-def title(ax, v):
-    fig = ax.get_figure()
-    fig.suptitle(rf"$t={float_to_latex(v.t[0] / (2 * np.pi))}$ yr")
-
-
+streamlines = ["VX1", "VX2"]
 inferno = {"cmap": "inferno"}
 quantities = [
-    MapMovie2D(
+    appl.MapMovie2D(
         "RHO",
-        r"\rho",
+        r"$\rho$",
         title="Gas density",
         plot_coords=[0, 0],
-        streamlines=["VX1", "VX2"],
-        customize=title,
-        style_kwargs={"cmap": "viridis"},
+        bounds=[1e-8, 1e-3],
+        norm="log",
+        # streamlines=streamlines,
+        style_kwargs={"cmap": "inferno"},
     ),
-    # MapMovie2D(
-    #     "beta",
-    #     r"$\beta$",
-    #     title=r"Plasma $\beta$ (poloidal)",
+    # appl.MapMovie2D(
+    #     "T",
+    #     r"$T$",
+    #     title=r"Temperature",
     #     plot_coords=[0, 1],
-    #     streamlines=["BX1", "BX2"],
-    #     compute=plasmabeta,
-    #     bounds=[1, betamid],
+    #     streamlines=streamlines,
+    #     compute=wd.temperature,
+    #     # bounds=[1e-4, 1e-4],
     #     norm="log",
     # ),
-    MapMovie2D(
-        "T",
-        r"$T$",
-        title=r"Temperature",
+    appl.MapMovie2D(
+        "CS",
+        r"$c_s$",
+        title=r"Sound speed",
         plot_coords=[0, 1],
-        streamlines=["VX1", "VX2"],
-        compute=wd.temperature,
+        streamlines=streamlines,
+        # bounds=[1e-4, 1e-4],
         norm="log",
     ),
-    MapMovie2D(
-        "vz",
-        r"$v_z$",
+    appl.MapMovie2D(
+        "VX1",
+        r"VX1",
         plot_coords=[0, 2],
-        streamlines=["VX1", "VX2"],
-        compute=wd.vz,
-        bounds=[-1e-5, 1e-5],
+        streamlines=streamlines,
+        bounds=[-1e-2, 1e-2],
         style_kwargs={"cmap": "coolwarm"},
+        # xmin=75,
+        # xmax=10,
+        # ymin=-10,
+        # ymax=10,
+    ),
+    appl.MapMovie2D(
+        "VX2",
+        r"$VX2$",
+        plot_coords=[0, 3],
+        streamlines=streamlines,
+        style_kwargs={"cmap": "coolwarm"},
+        bounds=[-1e-2, 1e-2],
+    ),
+    appl.MapMovie2D(
+        "VX3",
+        r"VX3",
+        plot_coords=[0, 4],
+        streamlines=streamlines,
+        bounds=[1e-1, 1],
+    ),
+    appl.MapMovie2D(
+        "EPHI",
+        r"$E_\phi$",
+        plot_coords=[1, 0],
+        streamlines=streamlines,
+    ),
+    appl.MapMovie2D(
+        "beta",
+        r"$\beta$",
+        plot_coords=[1, 1],
+        # streamlines=streamlines,
+        compute=plasmabeta,
+    ),
+    appl.MapMovie2D(
+        "INVDT",
+        r"InvDt",
+        title="CFL",
+        plot_coords=[0, 5],
+        norm="log",
     ),
 ]
-fig1 = Fig(quantities)
-# fig1 = Fig(
-#     [
-#         MapMovie2D("InvDt", plot_coords=[0, 0], streamlines=["VX1", "VX2"]),
-#     ]
-# )
-# fig1.axes[0, 0].xmin = 0
 
-
-custom_fields2D = []
+fig1 = appl.Fig(quantities)
 
 
 # Initialize context
 
 # Inject ONLY the 2D fields into the pipeline
-pipeline = Pipeline(runContext, [fig1])
+pipeline = appl.Pipeline(runContext, [fig1])
 
 if __name__ == "__main__":
     pipeline.run()

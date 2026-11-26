@@ -413,96 +413,99 @@ void Setup::InitFlow(DataBlock &data) {
   auto x2 = d.x[JDIR];
 
   // auto phi_part = d.Pfields.GetField<real>("phi");
-
-  // Many particles
-  // default state
-  for (int n = 0; n < ntot; n++) {
-    d.Ps(PX1, n) = 10.0;
-    d.Ps(PX2, n) = 1.0;
-    d.Ps(PX3, n) = 0;
-    d.Ps(PVX1, n) = 0.0;
-    d.Ps(PVX2, n) = 0.0;
-    d.Ps(PVX3, n) = 0.0;
-    d.Ps(PMASS, n) = 1.0e-3;
-    d.Ps(DRAGCOEFF, n) = 1.0;
-    // phi_part(n) = 0.0;
-  }
-
   int n = -1;
+  int k = d.beg[KDIR];
+
   for (int ii = 0; ii < num_r; ii++) {
-    real r0 = rmin + (rmax - rmin) * ii / (num_r - 1);
+    real frac_r = (num_r > 1) ? (real)ii / (num_r - 1) : 0.0;
+    real r0 = rmin + (rmax - rmin) * frac_r;
 
-    for (int jj = 0; jj < num_theta; jj++) {
-      real theta0 = thetamin + (thetamax - thetamin) * jj / (num_theta - 1);
-
-      for (int kk = 0; kk < num_size; kk++) {
-
-        // logspace
-        real log_betamin = log10(betamin); //
-        real log_betamax = log10(betamax); //
-
-        real log_beta = log_betamin + (log_betamax - log_betamin) * kk / (num_size - 1);
-
-        // real beta = betamin + (betamax - betamin) * kk / (num_size - 1);
-        real beta = pow(10, log_beta);
-
-        n++;
-
-        for (int k = 0; k < d.np_tot[KDIR]; k++) {
-          for (int j = 0; j < d.np_tot[JDIR]; j++) {
-            for (int i = 0; i < d.np_tot[IDIR]; i++) {
-              real r = d.x[IDIR](i);
-              real theta = d.x[JDIR](j);
-              real R = r * sin(theta);
-              real dr = d.dx[IDIR](i);
-              real dtheta = d.dx[JDIR](j);
-
-              if (abs(r - r0) < dr / 2 && abs(theta - theta0) < dtheta / 2 && n < ntot) {
-
-                real OmegaK = pow(R, -1.5);
-
-                real vr;
-                real vtheta;
-                real vphi;
-                real cs = sqrt(d.Vc(PRS, k, j, i) / d.Vc(RHO, k, j, i));
-
-                real tstop = beta / (d.Vc(RHO, k, j, i) * cs);
-
-                if (initialvelocity == "tv") {
-                  real delta = tstop * (pow(d.Vc(VX2, k, j, i), 2) / r - 1.0 / pow(r, 2));
-                  vr = d.Vc(VX1, k, j, i) + delta;
-                  vtheta = d.Vc(VX2, k, j, i);
-                  vphi = d.Vc(VX3, k, j, i);
-                } else if (initialvelocity == "zero") {
-                  vr = 0.0;
-                  vtheta = 0.0;
-                  vphi = R * OmegaK;
-                } else {
-                  vr = d.Vc(VX1, k, j, i);
-                  vtheta = d.Vc(VX2, k, j, i);
-                  vphi = R * OmegaK;
-                }
-
-                d.Ps(PX1, n) = r;
-                d.Ps(PX2, n) = theta;
-                d.Ps(PX3, n) = 0.0;
-                d.Ps(PVX1, n) = vr;
-                d.Ps(PVX2, n) = vtheta;
-                d.Ps(PVX3, n) = vphi;
-                d.Ps(PMASS, n) = 1.0e-10;
-                d.Ps(DRAGCOEFF, n) = beta;
-                d.Ps(TSTOP, n) = tstop;
-                // }
-              }
-            }
-          }
-        }
+    // 1. Find closest active radial cell
+    int best_i = d.beg[IDIR];
+    real min_dr = fabs(d.x[IDIR](best_i) - r0);
+    for (int i = d.beg[IDIR] + 1; i <= d.end[IDIR]; i++) {
+      real dist = fabs(d.x[IDIR](i) - r0);
+      if (dist < min_dr) {
+        min_dr = dist;
+        best_i = i;
       }
     }
+
+    for (int jj = 0; jj < num_theta; jj++) {
+      real frac_th = (num_theta > 1) ? (real)jj / (num_theta - 1) : 0.0;
+      real theta0 = thetamin + (thetamax - thetamin) * frac_th;
+
+      // 2. Find closest active theta cell
+      int best_j = d.beg[JDIR];
+      real min_dth = fabs(d.x[JDIR](best_j) - theta0);
+      for (int j = d.beg[JDIR] + 1; j <= d.end[JDIR]; j++) {
+        real dist = fabs(d.x[JDIR](j) - theta0);
+        if (dist < min_dth) {
+          min_dth = dist;
+          best_j = j;
+        }
+      }
+
+      // Sanity check: warn if (r0, theta0) was actually outside the domain
+      if (min_dr > 0.5 * d.dx[IDIR](best_i) * 1.01 || min_dth > 0.5 * d.dx[JDIR](best_j) * 1.01) {
+        printf("Warning: (r0=%g, theta0=%g) is outside active grid!\n", r0, theta0);
+      }
+
+      real r = d.x[IDIR](best_i);
+      real theta = d.x[JDIR](best_j);
+      real R = r * sin(theta);
+      real OmegaK = pow(R, -1.5);
+      real cs = sqrt(d.Vc(PRS, k, best_j, best_i) / d.Vc(RHO, k, best_j, best_i));
+
+      // 3. Assign all sizes at this exact cell
+      for (int kk = 0; kk < num_size; kk++) {
+        n++;
+        if (n >= ntot)
+          break;
+
+        real frac_s = (num_size > 1) ? (real)kk / (num_size - 1) : 0.0;
+        real log_beta = log10(betamin) + (log10(betamax) - log10(betamin)) * frac_s;
+        real beta = pow(10.0, log_beta);
+        real tstop = beta / (d.Vc(RHO, k, best_j, best_i) * cs);
+
+        real vr, vtheta, vphi;
+        if (initialvelocity == "tv") {
+          real delta = tstop * (pow(d.Vc(VX2, k, best_j, best_i), 2) / r - 1.0 / pow(r, 2));
+          vr = d.Vc(VX1, k, best_j, best_i) + delta;
+          vtheta = d.Vc(VX2, k, best_j, best_i);
+          vphi = d.Vc(VX3, k, best_j, best_i);
+        } else if (initialvelocity == "zero") {
+          vr = 0.0;
+          vtheta = 0.0;
+          vphi = R * OmegaK;
+        } else {
+          vr = d.Vc(VX1, k, best_j, best_i);
+          vtheta = d.Vc(VX2, k, best_j, best_i);
+          vphi = R * OmegaK;
+        }
+
+        d.Ps(PX1, n) = r;
+        d.Ps(PX2, n) = theta;
+        d.Ps(PX3, n) = 0.0;
+        d.Ps(PVX1, n) = vr;
+        d.Ps(PVX2, n) = vtheta;
+        d.Ps(PVX3, n) = vphi;
+        d.Ps(PMASS, n) = 1.0e-10;
+        d.Ps(DRAGCOEFF, n) = beta;
+        d.Ps(TSTOP, n) = tstop;
+      }
+    }
+    printf("ERROR: Initialized %d particles\n", n + 1);
   }
 
-  // delete image;
+  // Verify every single particle slot was filled
+  if (n + 1 != (int)ntot) {
+    printf("ERROR: Initialized %d particles, but PactiveCount is %d!\n", n + 1, (int)ntot);
+  } else {
+    printf("All %d / %d! particles initialized\n", n + 1, (int)ntot);
+  }
+}
 
-  // Send it all, if needed
-  d.SyncToDevice();
+// Send it all, if needed
+d.SyncToDevice();
 }

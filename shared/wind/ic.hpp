@@ -84,41 +84,26 @@ void MySourceTerm(Hydro *hydro, const real t, const real dtin) {
 
   idefix_for(
       "MySourceTerm", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], 0, data->np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-        real z = get_z(x1(i), x2(j), x3(k));
+        real r = get_r(x1(i), x2(j), x3(k));
         real R = get_R(x1(i), x2(j), x3(k));
         real R0 = FMAX(R, Rin);
 
         real Teff = Wind::temperature(x1(i), x2(j), x3(k), epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
-
-        real Ptarget = Teff * Vc(RHO, k, j, i);
-        // real tau = tau0 * (FMIN(pow(R, 1.5), 1.0));
         real tau = tau0 * pow(R0, 1.5);
-
-        real exp_factor = 1.0 - exp(-dt / tau);
-        real dE_thermal = -(Vc(PRS, k, j, i) - Ptarget) / gamma_m1 * exp_factor; // better?
-        Uc(ENG, k, j, i) += dE_thermal;
-
-    // Uc(ENG, k, j, i) += -dt * (Vc(PRS, k, j, i) - Ptarget) / (tau * gamma_m1);
-
-    // inner shell relaxation
 
 #ifdef RELAX
         real tauVel = tau;
-        real Tdisk = Teff;
-        if (R < 1.2) {
-          // real rhoTarget = 1.0 / (R0 * sqrt(R0)) * exp(1.0 / Tdisk * (1.0 / sqrt(R0 * R0 + z * z) - 1.0 / R0));
+        if (r < 1.25) {
           real rhoTarget = Wind::density_initial(x1(i), x2(j), x3(k), epsilon, Rin, densityFloor0);
-
-          //
-          // real vx3Target = 1.0 / sqrt(R0) * sqrt(FMAX(R0 / sqrt(R0 * R0 + z * z) - 2.5 * Tdisk, 0.0));
           real vphiTarget = Wind::vphi_initial(x1(i), x2(j), x3(k), epsilon, Rin);
-          //
+
           real drho = (Vc(RHO, k, j, i) - rhoTarget) / tauVel;
           real dmx1 = Vc(RHO, k, j, i) * Vc(VX1, k, j, i) / tauVel + Vc(VX1, k, j, i) * drho;
           real dmx2 = Vc(RHO, k, j, i) * Vc(VX2, k, j, i) / tauVel + Vc(VX2, k, j, i) * drho;
           real dmx3 = Vc(RHO, k, j, i) * (Vc(VX3, k, j, i) - vphiTarget) / tauVel + Vc(VX3, k, j, i) * drho;
-          real deng = Vc(VX1, k, j, i) * dmx1 + Vc(VX2, k, j, i) * dmx2 + Vc(VX3, k, j, i) * dmx3;
-          //
+          real v2 = Vc(VX1, k, j, i) * Vc(VX1, k, j, i) + Vc(VX2, k, j, i) * Vc(VX2, k, j, i) + Vc(VX3, k, j, i) * Vc(VX3, k, j, i);
+          real deng = Vc(VX1, k, j, i) * dmx1 + Vc(VX2, k, j, i) * dmx2 + Vc(VX3, k, j, i) * dmx3 - 0.5 * v2 * drho;
+
           Uc(RHO, k, j, i) += -drho * dt;
           Uc(MX1, k, j, i) += -dmx1 * dt;
           Uc(MX2, k, j, i) += -dmx2 * dt;
@@ -126,6 +111,11 @@ void MySourceTerm(Hydro *hydro, const real t, const real dtin) {
           Uc(ENG, k, j, i) += -deng * dt;
         }
 #endif
+
+        real Ptarget = Teff * Vc(RHO, k, j, i);
+        real exp_factor = 1.0 - exp(-dt / tau);
+        real dE_thermal = -(Vc(PRS, k, j, i) - Ptarget) / gamma_m1 * exp_factor;
+        Uc(ENG, k, j, i) += dE_thermal;
       });
 }
 

@@ -94,6 +94,15 @@ void InternalBoundary(Hydro *hydro, const real t) {
           Uc(ENG, k, j, i) = e_thermal + e_kinetic;
 #endif
 #endif
+
+          // Two choices here when adding density floor:
+          // - keep velocity constant
+          // - keep momentum constant.
+          // I choose the first option but I'm not entirely sure.
+
+          Uc(MX1, k, j, i) = rho_target * Vc(VX1, k, j, i);
+          Uc(MX2, k, j, i) = rho_target * Vc(VX2, k, j, i);
+          Uc(MX3, k, j, i) = rho_target * Vc(VX3, k, j, i);
         }
       });
 }

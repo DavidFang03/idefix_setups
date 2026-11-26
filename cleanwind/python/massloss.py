@@ -13,7 +13,7 @@ from common import WindyDisk, float_to_latex, plasmabeta
 discrete_cmap = plt.get_cmap("turbo_r").resampled(40)
 
 projectPath = "/home/dp316/dp316/dc-fang1/IdefixRuns/cleanwind"
-task = "hr_b1e3"
+task = "mr_relax_b1e3"
 
 
 runContext = Context(
@@ -25,6 +25,7 @@ runContext = Context(
 wd = WindyDisk(runContext.inidata, runContext.grid)
 
 
+beta0 = float(runContext.inidata["Setup"]["beta"])
 eps = float(runContext.inidata["Setup"]["epsilon"])
 betamid = float(runContext.inidata["Setup"]["beta"])
 densityFloor = float(runContext.inidata["Setup"]["densityFloor"])
@@ -155,44 +156,69 @@ quantities = [
     ),
 ]
 
+xmax = 10
 quantities = [
     MapMovie2D(
-        "RHO",
-        r"$\rho$",
-        title="Gas density",
-        plot_coords=[0, 0],
-        streamlines=["VX1", "VX2"],
-        customize=title,
-        bounds=[densityFloor, 1e-4],
-        style_kwargs={"cmap": "inferno"},
-        norm="log",
-        # xmax=10,
-        # ymin=-10,
-        # ymax=10,
+        "BX1",
+        plot_coords=[1, 1],
+        bounds=[-1e-4, 1e-4],
+        xmax=20,
+        ymin=-20,
+        ymax=20,
     ),
     MapMovie2D(
-        "beta",
-        r"$\beta$",
-        title=r"Plasma $\beta$ (poloidal)",
-        plot_coords=[0, 1],
-        streamlines=["BX1", "BX2"],
-        compute=plasmabeta,
-        bounds=[1, betamid],
-        norm="log",
-        contours=[1],
+        "BX2",
+        plot_coords=[1, 2],
+        bounds=[-1e-4, 1e-4],
+        xmax=20,
+        ymin=-20,
+        ymax=20,
     ),
-    LineMovie1D(
-        "zetap",
-        r"$\zeta_+$",
-        title="Wind mass loss (up)",
-        plot_coords=[0, 2],
-        compute=wd.massloss_up,
-        customize=grid,
-        xlabel="$R$",
-        yscale="log",
-        ymin=1e-7,
-        ymax=1e-4,
+    MapMovie2D(
+        "BX3",
+        plot_coords=[1, 3],
+        bounds=[-1e-4, 1e-4],
+        xmax=20,
+        ymin=-20,
+        ymax=20,
     ),
+    # MapMovie2D(
+    #     "RHO",
+    #     r"$\rho$",
+    #     title="Gas density",
+    #     plot_coords=[0, 0],
+    #     streamlines=["VX1", "VX2"],
+    #     customize=title,
+    #     bounds=[densityFloor, 1e-4],
+    #     style_kwargs={"cmap": "inferno"},
+    #     norm="log",
+    #     # xmax=10,
+    #     # ymin=-10,
+    #     # ymax=10,
+    # ),
+    # MapMovie2D(
+    #     "beta",
+    #     r"$\beta$",
+    #     title=r"Plasma $\beta$ (poloidal)",
+    #     plot_coords=[0, 1],
+    #     streamlines=["BX1", "BX2"],
+    #     compute=plasmabeta,
+    #     bounds=[1, betamid],
+    #     norm="log",
+    #     contours=[1],
+    # ),
+    # LineMovie1D(
+    #     "zetap",
+    #     r"$\zeta_+$",
+    #     title="Wind mass loss (up)",
+    #     plot_coords=[0, 2],
+    #     compute=wd.massloss_up,
+    #     customize=grid,
+    #     xlabel="$R$",
+    #     yscale="log",
+    #     ymin=1e-7,
+    #     ymax=1e-4,
+    # ),
     SpaceTimeHeatmap(
         "Psimid",
         r"$\Psi_\mathrm{mid}(R,t)$",
@@ -200,12 +226,22 @@ quantities = [
         plot_coords=[0, 0],
         compute=wd.flux_function,
         # xqty=wd.RLine,
-        xmax=10,
+        xmax=xmax,
         # norm="log",
         rotate=True,
-        bounds=[0, 2e-2],
+        bounds=[5e-4, 1e-2 * 1e4 / beta0 * np.pow(xmax / 10, 0.5)],
         style_kwargs={"cmap": discrete_cmap},
+        # yscale="log",
         # xmax=10,
+    ),
+    LineMovie1D(
+        "vB",
+        r"$v_B$",
+        plot_coords=[1, 0],
+        compute=wd.vB,
+        xlabel="$R$",
+        ymin=-0.001,
+        ymax=0.003,
     ),
     # LineMovie1D(
     #     "Bz0",
@@ -220,7 +256,7 @@ quantities = [
     # ),
 ]
 
-fig1 = Fig([quantities[-1]])
+fig1 = Fig(quantities)
 
 if __name__ == "__main__":
     pipeline = Pipeline(runContext, [fig1])

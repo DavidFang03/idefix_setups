@@ -28,22 +28,6 @@ std::string reload_path;
 
 using namespace Params;
 
-// void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
-//   IdefixArray1D<real> x1 = data.x[IDIR];
-//   IdefixArray1D<real> x2 = data.x[JDIR];
-//   IdefixArray1D<real> x3 = data.x[KDIR];
-//   real epsilon = epsilonGlob;
-//   real epsilonTop = epsilonTopGlob;
-//   real Hideal = HidealGlob;
-//   real trSmoothingTemp = trSmoothingTempGlob;
-//   real Rin = RinGlob;
-//   idefix_for(
-//       "MySoundSpeed", 0, data.np_tot[KDIR], 0, data.np_tot[JDIR], 0, data.np_tot[IDIR], KOKKOS_LAMBDA(int k, int j, int i) {
-//         real temp = Wind::temperature(x1(i), x2(j), x3(k), epsilon, epsilonTop, Rin, Hideal, trSmoothingTemp);
-//         cs(k, j, i) = sqrt(temp);
-//       });
-// }
-
 void MySoundSpeed(DataBlock &data, const real t, IdefixArray3D<real> &cs) {
   IdefixArray1D<real> r = data.x[IDIR];
   IdefixArray1D<real> th = data.x[JDIR];
@@ -105,10 +89,12 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
 
   // Use Invdt as scratch array
   IdefixArray3D<real> scrh("Scratch", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
+  IdefixArray3D<real> scrh_eta("Scratch_eta", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
 
   // Ask for a computation of xA ambipolar in this scratch array
 
 #ifndef DISABLE_MHD
+  Wind::Resistivity(data, data.t, scrh_eta);
   Wind::Ambipolar(data, data.t, scrh);
 #endif
 
@@ -120,6 +106,7 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
 
   // Make references to the user-defined arrays (variables is a container of IdefixHostArray3D)
   // Note that the labels should match the variable names in the input file
+  IdefixHostArray3D<real> Eta = variables["eta"];
   IdefixHostArray3D<real> Am = variables["Am"];
   IdefixHostArray3D<real> InvDt = variables["InvDt"];
   IdefixHostArray3D<real> Ephi = variables["Ephi"];
@@ -130,6 +117,8 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   IdefixHostArray4D<real> Vc = d.Vc;
   IdefixArray3D<real>::host_mirror_type scrhHost = Kokkos::create_mirror_view(scrh);
   Kokkos::deep_copy(scrhHost, scrh);
+  IdefixArray3D<real>::host_mirror_type scrhHost_eta = Kokkos::create_mirror_view(scrh_eta);
+  Kokkos::deep_copy(scrhHost_eta, scrh_eta);
 
   IdefixHostArray3D<real> cs = variables["cs"];
 
@@ -148,7 +137,8 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
         real R0 = FMAX(R, RinGlob);
         real Omega = pow(R0, -1.5);
 #ifndef DISABLE_MHD
-        Am(k, j, i) = 1.0 / (Omega * scrhHost(k, j, i) * Vc(RHO, k, j, i));
+        Eta(k, j, i) = scrhHost_eta(k, j, i);
+        Am(k, j, i) = scrhHost(k, j, i); // eta_A / B^2
         Ephi(k, j, i) = d.Ex3(k, j, i);
 #endif
         InvDt(k, j, i) = d.InvDt(k, j, i);
@@ -267,8 +257,8 @@ void Setup::InitFlow(DataBlock &data) {
   for (int k = 0; k < d.np_tot[KDIR]; k++) {
     for (int j = 0; j < d.np_tot[JDIR]; j++) {
       for (int i = 0; i < d.np_tot[IDIR]; i++) {
-        real x1 = d.x[IDIR](i);
-        real x2 = d.x[JDIR](j);
+        real x1 = d.xl[IDIR](i);
+        real x2 = d.xl[JDIR](j);
         real x3 = d.x[KDIR](k);
 
         real R = get_R(x1, x2, x3);
@@ -277,10 +267,11 @@ void Setup::InitFlow(DataBlock &data) {
         A(HOR, k, j, i) = ZERO_F;
         A(VER, k, j, i) = ZERO_F;
 
+        real Bin = B0 * pow(Rin, m); // B_z at Rin
         if (R > Rin) {
-          A(PHIDIR, k, j, i) = B0 * (pow(Rin, m + 2.0) / R * (-1.0 / (m + 2.0)) + pow(R, m + 1.0) / (m + 2.0) + Rin * Rin / (2.0 * R)); // check Rin
+          A(PHIDIR, k, j, i) = B0 * (pow(R, m + 1.0) / (m + 2.0) + pow(Rin, m + 2.0) * (0.5 - 1.0 / (m + 2.0)) / R);
         } else {
-          A(PHIDIR, k, j, i) = B0 * R / 2.0;
+          A(PHIDIR, k, j, i) = 0.5 * Bin * R;
         }
       }
     }

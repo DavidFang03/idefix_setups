@@ -46,6 +46,8 @@ void Ambipolar(DataBlock &data, real t, IdefixArray3D<real> &xAin) {
         else
           xA(k, j, i) = 1.0 / (Omega * Am * Vc(RHO, k, j, i));
 
+        // xA = etaA/B^2
+
         // Kill it at the radial boundaryloop
         // if (x1(i) / Rin < Rin * (1 + waveKillWidth)) {
         //   real w = (x1(i) - Rin) / (Rin * waveKillWidth);
@@ -89,7 +91,8 @@ void Resistivity(DataBlock &data, real t, IdefixArray3D<real> &etain) {
 
         real TransDC = 0.5 * (1.0 - window(R, z, Rin, epsilon, Hideal, trSmoothing));
 
-        real etaO = epsilon * epsilon * Rin * sqrt(Rin) * Vc(RHO, k, j, i) / Rm0copy * TransDC + EtaBuffer;
+        // real etaO = epsilon * epsilon * Rin * sqrt(Rin) * Vc(RHO, k, j, i) / Rm0copy * TransDC + EtaBuffer;
+        real etaO = epsilon * epsilon * R0 * sqrt(R0) * Vc(RHO, k, j, i) / (Rm0copy * Rinf) * TransDC + EtaBuffer;
 
         eta(k, j, i) = etaO;
       });
