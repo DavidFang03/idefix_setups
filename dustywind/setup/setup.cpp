@@ -462,8 +462,8 @@ void Setup::InitFlow(DataBlock &data) {
       real uphi = d.Vc(VX3, k, best_j, best_i);
 
       real ux = sin(theta) * ur + cos(theta) * utheta;
+      // real uy = uphi;
       real uz = cos(theta) * ur - sin(theta) * utheta;
-      // uy = uphi
 
       // 3. Assign all sizes at this exact cell
       for (int kk = 0; kk < num_size; kk++) {
@@ -485,15 +485,15 @@ void Setup::InitFlow(DataBlock &data) {
           // terminal velocity: assuming F + Fgrav = 0 in cartesian
           // with F = -delta/tstop => delta = tstop * Fgrav
           real deltax = tstop * (-sin(theta) / r ^ 2);
-          real deltay = 0.0;
+          // real deltay = 0.0;
           real deltaz = tstop * (-cos(theta) / r ^ 2);
           real vx = ux + deltax;
-          real vy = uy + deltay;
+          // real vy = uy + deltay;
           real vz = uz + deltaz;
 
           vr = sin(theta) * vx + cos(theta) * vz;
           vtheta = cos(theta) * vx - sin(theta) * vz;
-          vphi = vy;
+          vphi = uphi;
         } else if (initialvelocity == "zero") {
           vr = 0.0;
           vtheta = 0.0;
