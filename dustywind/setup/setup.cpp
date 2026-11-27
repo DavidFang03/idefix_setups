@@ -457,6 +457,14 @@ void Setup::InitFlow(DataBlock &data) {
       real OmegaK = pow(R, -1.5);
       real cs = sqrt(d.Vc(PRS, k, best_j, best_i) / d.Vc(RHO, k, best_j, best_i));
 
+      real ur = d.Vc(VX1, k, best_j, best_i);
+      real utheta = d.Vc(VX2, k, best_j, best_i);
+      real uphi = d.Vc(VX3, k, best_j, best_i);
+
+      real ux = sin(theta) * ur + cos(theta) * utheta;
+      real uz = cos(theta) * ur - sin(theta) * utheta;
+      // uy = uphi
+
       // 3. Assign all sizes at this exact cell
       for (int kk = 0; kk < num_size; kk++) {
         n++;
@@ -470,17 +478,29 @@ void Setup::InitFlow(DataBlock &data) {
 
         real vr, vtheta, vphi;
         if (initialvelocity == "tv") {
-          real delta = tstop * (pow(d.Vc(VX2, k, best_j, best_i), 2) / r - 1.0 / pow(r, 2));
-          vr = d.Vc(VX1, k, best_j, best_i) + delta;
-          vtheta = d.Vc(VX2, k, best_j, best_i);
-          vphi = d.Vc(VX3, k, best_j, best_i);
+          // spherical -> cartesian -> spherical
+          // u = gas velocity
+          // v = dust velocity
+          // v = u + delta
+          // terminal velocity: assuming F + Fgrav = 0 in cartesian
+          // with F = -delta/tstop => delta = tstop * Fgrav
+          real deltax = tstop * (-sin(theta) / r ^ 2);
+          real deltay = 0.0;
+          real deltaz = tstop * (-cos(theta) / r ^ 2);
+          real vx = ux + deltax;
+          real vy = uy + deltay;
+          real vz = uz + deltaz;
+
+          vr = sin(theta) * vx + cos(theta) * vz;
+          vtheta = cos(theta) * vx - sin(theta) * vz;
+          vphi = vy;
         } else if (initialvelocity == "zero") {
           vr = 0.0;
           vtheta = 0.0;
           vphi = R * OmegaK;
         } else {
-          vr = d.Vc(VX1, k, best_j, best_i);
-          vtheta = d.Vc(VX2, k, best_j, best_i);
+          vr = ur;
+          vtheta = utheta;
           vphi = R * OmegaK;
         }
 
