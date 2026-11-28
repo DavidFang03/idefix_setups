@@ -3,4 +3,6 @@
 #define GEOMETRY SPHERICAL
 #define SMALL_PRESSURE_TEMPERATURE (0.05)
 #define CORONA
+#define RELAX
+
 // #define RELOAD

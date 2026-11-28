@@ -6,7 +6,7 @@ import appl
 RUNS_FOLDER_PATH = str(os.getenv("RUNS_FOLDER_PATH"))
 
 project = "cleanwind"
-runName = "mr_relax_b1e3"
+runName = "hr2_b1e4"
 
 runContext = appl.Context(
     runName=runName,
