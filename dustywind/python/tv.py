@@ -5,7 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-runName = "1M_fluid_b1e3"
+runName = "fluid_b1e3"
 RUNS_FOLDER_PATH = str(os.getenv("RUNS_FOLDER_PATH"))
 
 project = "dustywind"
@@ -111,10 +111,12 @@ def colors(ds):
 def inspect_particle_initialvelocity(ax, ds1, nb, pipeline):
 
     ds = pipeline.context.datatest_particles
+    uids = np.arange(len(ds["x1"].data))
+
     r, theta, sizes = ds["x1"].data[uids], ds["x2"].data[uids], (size(ds) * 1e6)[uids]
     x, y = r * np.sin(theta), r * np.cos(theta)
 
-    sc = ax.scatter(x, y, c=colors(ds1)[uids], alpha=0.5)
+    sc = ax.scatter(x, y, c=colors(ds1)[uids], s=1e-2, alpha=0.9)
     # fig = ax.get_figure()
     # fig.colorbar(sc, label="size (um)")
 

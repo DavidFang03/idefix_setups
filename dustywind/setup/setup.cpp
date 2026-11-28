@@ -317,12 +317,13 @@ void fill_all_upper_cells_with_particles(DataBlockHost &d) {
   real size = sizemin;
   int k = d.beg[KDIR];
   int n = -1;
-  for (int j = 0; j < d.np_tot[JDIR]; j++) {
-    for (int i = 0; i < d.np_tot[IDIR]; i++) {
+  int jmid = d.np_tot[JDIR] / 2;
+  for (int j = 0; j < jmid; j++) {
+    for (int i = 100; i < d.np_tot[IDIR]; i++) {
       real r = d.x[IDIR](i);
       real theta = d.x[JDIR](j);
       real phi = d.x[KDIR](k);
-      if (n < d.PactiveCount and theta < M_PI / 2) {
+      if (n < d.PactiveCount and theta > M_PI / 16.0 and theta < M_PI / 2.0 and r > 10.0) {
         n++;
         real tstop = get_tstop(size, d.Vc(RHO, k, j, i), d.Vc(PRS, k, j, i));
         auto [vr, vtheta] = v_tv(d.Vc(VX1, k, j, i), d.Vc(VX2, k, j, i), r, theta, tstop);
@@ -346,10 +347,10 @@ void fill_all_upper_cells_with_particles(DataBlockHost &d) {
   while (n < d.PactiveCount) { // toss em
     n++;
 
-    d.Ps(PX1, n) = 2.0;
+    d.Ps(PX1, n) = 1.0001;
     d.Ps(PX2, n) = M_PI;
     d.Ps(PX3, n) = 0.0;
-    d.Ps(PVX1, n) = 0.0;
+    d.Ps(PVX1, n) = -1.0;
     d.Ps(PVX2, n) = 0.0;
     d.Ps(PVX3, n) = 0.0;
     d.Ps(PMASS, n) = 1.0;
