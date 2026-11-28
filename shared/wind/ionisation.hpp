@@ -25,7 +25,6 @@ void Ambipolar(DataBlock &data, real t, IdefixArray3D<real> &xAin) {
   real epsilon = epsilonGlob;
   real AmMid = AmMidGlob;
   real etamax = 10 * epsilon * epsilon; // Corresponds to Rm=0.1
-  real waveKillWidth = 0.1;
   real trSmoothing = trSmoothingGlob;
   real Rin = RinGlob;
 
@@ -49,6 +48,7 @@ void Ambipolar(DataBlock &data, real t, IdefixArray3D<real> &xAin) {
         // xA = etaA/B^2
 
         // Kill it at the radial boundaryloop
+        // real waveKillWidth = 0.1;
         // if (x1(i) / Rin < Rin * (1 + waveKillWidth)) {
         //   real w = (x1(i) - Rin) / (Rin * waveKillWidth);
 

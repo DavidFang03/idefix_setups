@@ -5,6 +5,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+runName = "1M_b1e3"
+
 
 def size(v):
     beta = v["dragcoeff"].data
@@ -164,7 +166,6 @@ if __name__ == "__main__":
     RUNS_FOLDER_PATH = str(os.getenv("RUNS_FOLDER_PATH"))
 
     project = "dustywind"
-    runName = "1e6_b1e3"
 
     runContext = appl.Context(
         runName=runName,
@@ -211,7 +212,7 @@ if __name__ == "__main__":
             title="Gas density",
             plot_coords=[0, 0],
             streamlines=["VX1", "VX2"],
-            bounds=[densityFloor * 1000, 1e-2],
+            bounds=[densityFloor * 100, 1e-2],
             style_kwargs={"cmap": "inferno"},
             customize=add_line_colorbar,
             ymin=0,

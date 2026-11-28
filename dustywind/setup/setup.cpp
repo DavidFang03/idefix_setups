@@ -20,6 +20,10 @@ real num_r;
 real num_theta;
 real num_size;
 
+real rho0 = 6.0e-10; // rho = 1 code units corresponds to this value in g/cm3
+real rhos = 1.0;     // 1 g/cm3
+real au = 1.5e11;    // r=1 is 1 au i.e 1.5e11 m
+
 static std::string reload_path;
 static std::string initialvelocity;
 
@@ -54,8 +58,6 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
       iend = data->np_tot[IDIR];
       idefix_for(
           "UserDefBoundaryDustIRight", 0, data->np_tot[KDIR], 0, data->np_tot[JDIR], ibeg, iend, KOKKOS_LAMBDA(int k, int j, int i) {
-            real R = x1(i);
-
             Vc(RHO, k, j, i) = Vc(RHO, k, j, ighost);
             if (Vc(VX1, k, j, ighost) <= ZERO_F) {
               Vc(VX1, k, j, i) = 0.0;
@@ -95,8 +97,11 @@ void UserdefBoundaryDust(Fluid<DustPhysics> *dust, int dir, BoundarySide side, r
   }
 }
 
-void MyDrag(DataBlock *data, real beta, IdefixArray3D<real> &gamma) {
-  // Compute the drag coefficient gamma from the input beta
+void MyDrag(DataBlock *data, real size, IdefixArray3D<real> &gamma) {
+  // Compute the drag coefficient gamma = 1/(rhos a) with Esptein regime
+  // input value is mass in meter.
+  real beta = (rhos * size) / (rho0 * au);
+
   auto VcGas = data->hydro->Vc;
 
   idefix_for(
@@ -225,10 +230,12 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
 
   // Use Invdt as scratch array
   IdefixArray3D<real> scrh("Scratch", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
+  IdefixArray3D<real> scrh_eta("Scratch_eta", data.np_tot[KDIR], data.np_tot[JDIR], data.np_tot[IDIR]);
 
   // Ask for a computation of xA ambipolar in this scratch array
 
 #ifndef DISABLE_MHD
+  Wind::Resistivity(data, data.t, scrh_eta);
   Wind::Ambipolar(data, data.t, scrh);
 #endif
 
@@ -240,6 +247,7 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
 
   // Make references to the user-defined arrays (variables is a container of IdefixHostArray3D)
   // Note that the labels should match the variable names in the input file
+  IdefixHostArray3D<real> Eta = variables["eta"];
   IdefixHostArray3D<real> Am = variables["Am"];
   IdefixHostArray3D<real> InvDt = variables["InvDt"];
   IdefixHostArray3D<real> Ephi = variables["Ephi"];
@@ -250,6 +258,8 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   IdefixHostArray4D<real> Vc = d.Vc;
   IdefixArray3D<real>::host_mirror_type scrhHost = Kokkos::create_mirror_view(scrh);
   Kokkos::deep_copy(scrhHost, scrh);
+  IdefixArray3D<real>::host_mirror_type scrhHost_eta = Kokkos::create_mirror_view(scrh_eta);
+  Kokkos::deep_copy(scrhHost_eta, scrh_eta);
 
   IdefixHostArray3D<real> cs = variables["cs"];
 
@@ -268,7 +278,8 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
         real R0 = FMAX(R, RinGlob);
         real Omega = pow(R0, -1.5);
 #ifndef DISABLE_MHD
-        Am(k, j, i) = 1.0 / (Omega * scrhHost(k, j, i) * Vc(RHO, k, j, i));
+        Eta(k, j, i) = scrhHost_eta(k, j, i);
+        Am(k, j, i) = scrhHost(k, j, i); // eta_A / B^2
         Ephi(k, j, i) = d.Ex3(k, j, i);
 #endif
         InvDt(k, j, i) = d.InvDt(k, j, i);
@@ -282,11 +293,228 @@ void ComputeUserVars(DataBlock &data, UserDefVariablesContainer &variables) {
   }
 }
 
+real get_beta(real size) { return rhos * sizemin / (rho0 * au); }
+real get_tstop(real size, real rho, real prs) {
+  // = beta/(rho cs) = beta/sqrt(rho prs)
+  return get_beta(size) / sqrt(rho * prs);
+}
+
+std::pair<real, real> v_tv(real ur, real utheta, real r, real theta, real tstop) {
+  real ux = sin(theta) * ur + cos(theta) * utheta;
+  real uz = cos(theta) * ur - sin(theta) * utheta;
+  real deltax = tstop * (-sin(theta) / pow(r, 2));
+  real deltaz = tstop * (-cos(theta) / pow(r, 2));
+  real vx = ux + deltax;
+  real vz = uz + deltaz;
+
+  real vr = sin(theta) * vx + cos(theta) * vz;
+  real vtheta = cos(theta) * vx - sin(theta) * vz;
+
+  return {vr, vtheta};
+}
+
+void fill_all_upper_cells_with_particles(DataBlockHost &d) {
+  real size = sizemin;
+  int k = d.beg[KDIR];
+  int n = -1;
+  for (int j = 0; j < d.np_tot[JDIR]; j++) {
+    for (int i = 0; i < d.np_tot[IDIR]; i++) {
+      real r = d.x[IDIR](i);
+      real theta = d.x[JDIR](j);
+      real phi = d.x[KDIR](k);
+      if (n < d.PactiveCount and theta < M_PI / 2) {
+        n++;
+        real tstop = get_tstop(size, d.Vc(RHO, k, j, i), d.Vc(PRS, k, j, i));
+        auto [vr, vtheta] = v_tv(d.Vc(VX1, k, j, i), d.Vc(VX2, k, j, i), r, theta, tstop);
+
+        d.Ps(PX1, n) = r;
+        d.Ps(PX2, n) = theta;
+        d.Ps(PX3, n) = phi;
+        d.Ps(PVX1, n) = vr;
+        d.Ps(PVX2, n) = vtheta;
+        d.Ps(PVX3, n) = d.Vc(VX3, k, j, i);
+        d.Ps(PMASS, n) = size;
+        // the real value would be around 1e-40 in code units. I'm afraid of underflows so I rather put a wrong value (the size in m instead). Dynamics should be independent of mass anyway, as long as
+        // there's no feedback
+        d.Ps(DRAGCOEFF, n) = get_beta(size);
+        d.Ps(TSTOP, n) = tstop;
+      }
+    }
+  }
+  printf("Initialized %d particles\n", n + 1);
+
+  while (n < d.PactiveCount) { // toss em
+    n++;
+
+    d.Ps(PX1, n) = 2.0;
+    d.Ps(PX2, n) = M_PI;
+    d.Ps(PX3, n) = 0.0;
+    d.Ps(PVX1, n) = 0.0;
+    d.Ps(PVX2, n) = 0.0;
+    d.Ps(PVX3, n) = 0.0;
+    d.Ps(PMASS, n) = 1.0;
+    // the real value would be around 1e-40 in code units. I'm afraid of underflows so I rather put a wrong value (the size in m instead). Dynamics should be independent of mass anyway, as long as
+    // there's no feedback
+    d.Ps(DRAGCOEFF, n) = 1.0;
+    d.Ps(TSTOP, n) = 1.0;
+  }
+  printf("Initialized %d particles\n", n + 1);
+}
+
+void wedge(DataBlockHost &d) {
+  real ntot = d.PactiveCount;
+
+  real betamin = rhos * sizemin / (rho0 * au);
+  real betamax = rhos * sizemax / (rho0 * au);
+
+  real massmin = betamin * (sizemin / au) * (sizemin / au); // for logs only
+  real massmax = betamax * (sizemax / au) * (sizemax / au); // for logs only
+
+  real thetamin = M_PI / 2.0 - atan(epsilonGlob * hmax);
+  real thetamax = M_PI / 2.0 - atan(epsilonGlob * hmin);
+
+  printf("Number of particles: %.1e\n", ntot);
+  printf("dust betas range from: %.1e\n", betamin);
+  printf(" to: %.1e\n", betamax);
+  printf("dust masses range from: %.1e\n", massmin);
+  printf(" to: %.1e\n", massmax);
+
+  // int npart = 0;
+  auto x1 = d.x[IDIR];
+  auto x2 = d.x[JDIR];
+
+  // auto phi_part = d.Pfields.GetField<real>("phi");
+  int n = -1;
+  int k = d.beg[KDIR];
+
+  for (int ii = 0; ii < num_r; ii++) {
+    real frac_r = (num_r > 1) ? (real)ii / (num_r - 1) : 0.0;
+    real r0 = rmin + (rmax - rmin) * frac_r;
+
+    // 1. Find closest active radial cell
+    int best_i = d.beg[IDIR];
+    real min_dr = fabs(d.x[IDIR](best_i) - r0);
+    for (int i = d.beg[IDIR] + 1; i <= d.end[IDIR]; i++) {
+      real dist = fabs(d.x[IDIR](i) - r0);
+      if (dist < min_dr) {
+        min_dr = dist;
+        best_i = i;
+      }
+    }
+
+    for (int jj = 0; jj < num_theta; jj++) {
+      real frac_th = (num_theta > 1) ? (real)jj / (num_theta - 1) : 0.0;
+      real theta0 = thetamin + (thetamax - thetamin) * frac_th;
+
+      // 2. Find closest active theta cell
+      int best_j = d.beg[JDIR];
+      real min_dth = fabs(d.x[JDIR](best_j) - theta0);
+      for (int j = d.beg[JDIR] + 1; j <= d.end[JDIR]; j++) {
+        real dist = fabs(d.x[JDIR](j) - theta0);
+        if (dist < min_dth) {
+          min_dth = dist;
+          best_j = j;
+        }
+      }
+
+      // Sanity check: warn if (r0, theta0) was actually outside the domain
+      if (min_dr > 0.5 * d.dx[IDIR](best_i) * 1.01 || min_dth > 0.5 * d.dx[JDIR](best_j) * 1.01) {
+        printf("Warning: (r0=%g, theta0=%g) is outside active grid!\n", r0, theta0);
+      }
+
+      real r = d.x[IDIR](best_i);
+      real theta = d.x[JDIR](best_j);
+      real R = r * sin(theta);
+      real OmegaK = pow(R, -1.5);
+      real cs = sqrt(d.Vc(PRS, k, best_j, best_i) / d.Vc(RHO, k, best_j, best_i));
+
+      real ur = d.Vc(VX1, k, best_j, best_i);
+      real utheta = d.Vc(VX2, k, best_j, best_i);
+      real uphi = d.Vc(VX3, k, best_j, best_i);
+
+      real ux = sin(theta) * ur + cos(theta) * utheta;
+      // real uy = uphi;
+      real uz = cos(theta) * ur - sin(theta) * utheta;
+
+      // 3. Assign all sizes at this exact cell
+      for (int kk = 0; kk < num_size; kk++) {
+        n++;
+        if (n >= ntot)
+          break;
+
+        real frac_s = (num_size > 1) ? (real)kk / (num_size - 1) : 0.0;
+        real log_beta = log10(betamin) + (log10(betamax) - log10(betamin)) * frac_s;
+        real beta = pow(10.0, log_beta);
+        real log_size = log10(sizemin) + (log10(sizemax) - log10(sizemin)) * frac_s;
+        real size = pow(10.0, log_size);
+        real tstop = beta / (d.Vc(RHO, k, best_j, best_i) * cs);
+
+        real vr, vtheta, vphi;
+        if (initialvelocity == "tv") {
+          // spherical -> cartesian -> spherical
+          // u = gas velocity
+          // v = dust velocity
+          // v = u + delta
+          // terminal velocity: assuming F + Fgrav = 0 in cartesian
+          // with F = -delta/tstop => delta = tstop * Fgrav
+          real deltax = tstop * (-sin(theta) / pow(r, 2));
+          // real deltay = 0.0;
+          real deltaz = tstop * (-cos(theta) / pow(r, 2));
+          real vx = ux + deltax;
+          // real vy = uy + deltay;
+          real vz = uz + deltaz;
+
+          vr = sin(theta) * vx + cos(theta) * vz;
+          vtheta = cos(theta) * vx - sin(theta) * vz;
+          vphi = uphi;
+        } else if (initialvelocity == "zero") {
+          vr = 0.0;
+          vtheta = 0.0;
+          vphi = R * OmegaK;
+        } else {
+          vr = ur;
+          vtheta = utheta;
+          vphi = R * OmegaK;
+        }
+
+        d.Ps(PX1, n) = r;
+        d.Ps(PX2, n) = theta;
+        d.Ps(PX3, n) = 0.0;
+        d.Ps(PVX1, n) = vr;
+        d.Ps(PVX2, n) = vtheta;
+        d.Ps(PVX3, n) = vphi;
+        d.Ps(PMASS, n) = size;
+        // the real value would be around 1e-40 in code units. I'm afraid of underflows so I rather put a wrong value (the size in m instead). Dynamics should be independent of mass anyway, as long as
+        // there's no feedback
+        d.Ps(DRAGCOEFF, n) = beta;
+        d.Ps(TSTOP, n) = tstop;
+      }
+    }
+    printf("Initialized %d particles\n", n + 1);
+  }
+
+  // Verify every single particle slot was filled
+  if (n + 1 != (int)ntot) {
+    printf("ERROR: Initialized %d particles, but PactiveCount is %d!\n", n + 1, (int)ntot);
+  } else {
+    printf("All %d / %d particles initialized\n", n + 1, (int)ntot);
+  }
+}
+
 // Default constructor
 
 // Initialisation routine. Can be used to allocate
 // Arrays or variables which are used later on
 Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
+
+  // Set the function for userdefboundary
+  if (data.haveDust) {
+    int nSpecies = data.dust.size();
+    for (int n = 0; n < nSpecies; n++) {
+      data.dust[n]->EnrollUserDefBoundary(&UserdefBoundaryDust);
+      data.dust[n]->drag->EnrollUserDrag(&MyDrag);
+    }
+  }
   // Set the function for userdefboundary
   data.hydro->EnrollUserDefBoundary(&Wind::UserdefBoundary);
   data.hydro->EnrollAmbipolarDiffusivity(&Wind::Ambipolar);
@@ -298,14 +526,6 @@ Setup::Setup(Input &input, Grid &grid, DataBlock &data, Output &output) {
 
   data.gravity->EnrollBodyForce(BodyForce);
   data.particles->EnrollBodyForce(ParticlesBodyForce);
-
-  if (data.haveDust) {
-    int nSpecies = data.dust.size();
-    for (int n = 0; n < nSpecies; n++) {
-      data.dust[n]->EnrollUserDefBoundary(&UserdefBoundaryDust);
-      data.dust[n]->drag->EnrollUserDrag(&MyDrag);
-    }
-  }
 
   output.EnrollUserDefVariables(&ComputeUserVars);
   gammaGlob = data.hydro->eos->GetGamma();
@@ -387,145 +607,28 @@ void Setup::InitFlow(DataBlock &data) {
     }
   }
 
-  real ntot = d.PactiveCount;
+  fill_all_upper_cells_with_particles(d);
 
-  real rho0 = 6.0e-10;
-  real rhos = 1.0; // 1 g/cm3
-  real au = 1.5e11;
+  if (data.haveDust) {
+    for (int k = 0; k < d.np_tot[KDIR]; k++) {
+      for (int j = 0; j < d.np_tot[JDIR]; j++) {
+        for (int i = 0; i < d.np_tot[IDIR]; i++) {
+          for (int n = 0; n < data.dust.size(); n++) {
+            // d.dustVc[n](RHO, k, j, i) = d.Vc(RHO, k, j, i);
+            real r = d.x[IDIR][i];
+            real theta = d.x[JDIR][j];
 
-  real betamin = rhos * sizemin / (rho0 * au);
-  real betamax = rhos * sizemax / (rho0 * au);
+            // auto [vr, vtheta] = v_tv(d.Vc(VX1, k, j, i), d.Vc(VX2, k, j, i), r, theta, tstop);
 
-  real massmin = betamin * (sizemin / au) * (sizemin / au);
-  real massmax = betamax * (sizemax / au) * (sizemax / au);
-
-  real thetamin = M_PI / 2.0 - atan(epsilonGlob * hmax);
-  real thetamax = M_PI / 2.0 - atan(epsilonGlob * hmin);
-
-  printf("Number of particles: %.1e\n", ntot);
-  printf("dust betas range from: %.1e\n", betamin);
-  printf(" to: %.1e\n", betamax);
-  printf("dust masses range from: %.1e\n", massmin);
-  printf(" to: %.1e\n", massmax);
-
-  // int npart = 0;
-  auto x1 = d.x[IDIR];
-  auto x2 = d.x[JDIR];
-
-  // auto phi_part = d.Pfields.GetField<real>("phi");
-  int n = -1;
-  int k = d.beg[KDIR];
-
-  for (int ii = 0; ii < num_r; ii++) {
-    real frac_r = (num_r > 1) ? (real)ii / (num_r - 1) : 0.0;
-    real r0 = rmin + (rmax - rmin) * frac_r;
-
-    // 1. Find closest active radial cell
-    int best_i = d.beg[IDIR];
-    real min_dr = fabs(d.x[IDIR](best_i) - r0);
-    for (int i = d.beg[IDIR] + 1; i <= d.end[IDIR]; i++) {
-      real dist = fabs(d.x[IDIR](i) - r0);
-      if (dist < min_dr) {
-        min_dr = dist;
-        best_i = i;
-      }
-    }
-
-    for (int jj = 0; jj < num_theta; jj++) {
-      real frac_th = (num_theta > 1) ? (real)jj / (num_theta - 1) : 0.0;
-      real theta0 = thetamin + (thetamax - thetamin) * frac_th;
-
-      // 2. Find closest active theta cell
-      int best_j = d.beg[JDIR];
-      real min_dth = fabs(d.x[JDIR](best_j) - theta0);
-      for (int j = d.beg[JDIR] + 1; j <= d.end[JDIR]; j++) {
-        real dist = fabs(d.x[JDIR](j) - theta0);
-        if (dist < min_dth) {
-          min_dth = dist;
-          best_j = j;
+            d.dustVc[n](RHO, k, j, i) = 1.0 / (r * r); // because one particle in each cell, with uniform theta spacing and log radial spacing => rho propto 1/r^2
+            d.dustVc[n](VX1, k, j, i) = 0.0;
+            d.dustVc[n](VX2, k, j, i) = 0.0;
+            d.dustVc[n](VX3, k, j, i) = d.Vc(VX3, k, j, i);
+          }
         }
       }
-
-      // Sanity check: warn if (r0, theta0) was actually outside the domain
-      if (min_dr > 0.5 * d.dx[IDIR](best_i) * 1.01 || min_dth > 0.5 * d.dx[JDIR](best_j) * 1.01) {
-        printf("Warning: (r0=%g, theta0=%g) is outside active grid!\n", r0, theta0);
-      }
-
-      real r = d.x[IDIR](best_i);
-      real theta = d.x[JDIR](best_j);
-      real R = r * sin(theta);
-      real OmegaK = pow(R, -1.5);
-      real cs = sqrt(d.Vc(PRS, k, best_j, best_i) / d.Vc(RHO, k, best_j, best_i));
-
-      real ur = d.Vc(VX1, k, best_j, best_i);
-      real utheta = d.Vc(VX2, k, best_j, best_i);
-      real uphi = d.Vc(VX3, k, best_j, best_i);
-
-      real ux = sin(theta) * ur + cos(theta) * utheta;
-      // real uy = uphi;
-      real uz = cos(theta) * ur - sin(theta) * utheta;
-
-      // 3. Assign all sizes at this exact cell
-      for (int kk = 0; kk < num_size; kk++) {
-        n++;
-        if (n >= ntot)
-          break;
-
-        real frac_s = (num_size > 1) ? (real)kk / (num_size - 1) : 0.0;
-        real log_beta = log10(betamin) + (log10(betamax) - log10(betamin)) * frac_s;
-        real beta = pow(10.0, log_beta);
-        real tstop = beta / (d.Vc(RHO, k, best_j, best_i) * cs);
-
-        real vr, vtheta, vphi;
-        if (initialvelocity == "tv") {
-          // spherical -> cartesian -> spherical
-          // u = gas velocity
-          // v = dust velocity
-          // v = u + delta
-          // terminal velocity: assuming F + Fgrav = 0 in cartesian
-          // with F = -delta/tstop => delta = tstop * Fgrav
-          real deltax = tstop * (-sin(theta) / r ^ 2);
-          // real deltay = 0.0;
-          real deltaz = tstop * (-cos(theta) / r ^ 2);
-          real vx = ux + deltax;
-          // real vy = uy + deltay;
-          real vz = uz + deltaz;
-
-          vr = sin(theta) * vx + cos(theta) * vz;
-          vtheta = cos(theta) * vx - sin(theta) * vz;
-          vphi = uphi;
-        } else if (initialvelocity == "zero") {
-          vr = 0.0;
-          vtheta = 0.0;
-          vphi = R * OmegaK;
-        } else {
-          vr = ur;
-          vtheta = utheta;
-          vphi = R * OmegaK;
-        }
-
-        d.Ps(PX1, n) = r;
-        d.Ps(PX2, n) = theta;
-        d.Ps(PX3, n) = 0.0;
-        d.Ps(PVX1, n) = vr;
-        d.Ps(PVX2, n) = vtheta;
-        d.Ps(PVX3, n) = vphi;
-        d.Ps(PMASS, n) = 1.0e-10;
-        d.Ps(DRAGCOEFF, n) = beta;
-        d.Ps(TSTOP, n) = tstop;
-      }
     }
-    printf("ERROR: Initialized %d particles\n", n + 1);
   }
-
-  // Verify every single particle slot was filled
-  if (n + 1 != (int)ntot) {
-    printf("ERROR: Initialized %d particles, but PactiveCount is %d!\n", n + 1, (int)ntot);
-  } else {
-    printf("All %d / %d! particles initialized\n", n + 1, (int)ntot);
-  }
-}
-
-// Send it all, if needed
-d.SyncToDevice();
+  // Send it all, if needed
+  d.SyncToDevice();
 }

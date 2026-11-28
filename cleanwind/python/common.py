@@ -399,13 +399,14 @@ class FluxTransport:
         self.ds = ds
 
         self.Jphi = np.squeeze(curl_phi(r, theta, ds["BX1"].data, ds["BX2"].data))
-        print(self.ds["AM"].data)
 
         self._advection_term = self.vx - (self.vz * self.Bx) / self.Bz
 
         self._ohmic_term = np.squeeze(self.ds["ETA"].data) * self.Jphi / self.Bz
 
         self._ambipolar_term = np.squeeze(self.ds["AM"].data) * self.Jphi * self.Bz
+
+        self._from_idefix = np.squeeze(self.ds["EPHI"].data) / self.Bz
 
     def at(self, x: float, Z: np.ndarray):
         assert x > 0
@@ -433,3 +434,7 @@ class FluxTransport:
             self.theta,
             self._advection_term + self._ohmic_term + self._ambipolar_term,
         )(self.points)
+
+    @property
+    def from_idefix(self):
+        return interpolate(self.r, self.theta, self._from_idefix)(self.points)
